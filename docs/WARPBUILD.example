@@ -1,0 +1,21 @@
+# Example WARPBUILD — build hello from source
+# Place this file in a directory and run: warp -build <dir>
+
+pkgname=hello
+pkgver=2.12
+arch=x86_64
+deps=glibc
+makedeps=gcc,make
+license=GPL-3.0
+description=GNU Hello — prints a greeting
+source=https://ftp.gnu.org/gnu/hello/hello-2.12.tar.gz
+sha256=cf04af86dc085268c5f4470fbae49b18afbc221b78096aab842d934a76bad0ab
+
+build() {
+    ./configure --prefix=/usr
+    make
+}
+
+package() {
+    make install DESTDIR="$DESTDIR"
+}

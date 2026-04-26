@@ -16,6 +16,7 @@ source "$SCRIPT_DIR/lib/format.sh"
 source "$SCRIPT_DIR/lib/install.sh"
 source "$SCRIPT_DIR/lib/remove.sh"
 source "$SCRIPT_DIR/lib/build.sh"
+source "$SCRIPT_DIR/lib/build_src.sh"
 source "$SCRIPT_DIR/lib/repo.sh"
 
 config_load
@@ -44,7 +45,9 @@ Query:
   -ls <query>        Search repository for packages
 
 Building:
-  -cP <folder>       Build a .wrp package from folder
+  -cP <folder>       Build a .wrp package from folder (binary)
+  -build <folder>    Build a .wrp from source (uses WARPBUILD)
+  -buildI <folder>   Build from source and install immediately
   --verify <file>    Verify checksum of a .wrp file
   --push <file>      Upload package to repository
 
@@ -176,6 +179,8 @@ case "$1" in
     -U)      done_err "Upgrade not yet implemented" ;;
     -LU)     done_err "List updates not yet implemented" ;;
     -cP)     build_pkg "$2" && echo "" && done_ok ;;
+    -build)  build_from_source "$2" 0 && done_ok ;;
+    -buildI) build_from_source "$2" 1 && done_ok ;;
     --sync)  repo_sync && echo "" && done_ok ;;
     -info)   cmd_sysinfo ;;
     -help|--help|-h) usage ;;
