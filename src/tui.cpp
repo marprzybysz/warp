@@ -52,7 +52,7 @@ void progress_bar(int percent, const std::string& /*action*/) {
 
     int tw = term_width();
 
-    std::string prefix = "Progress: " + std::to_string(percent) + "% ";
+    std::string prefix = "Progress:" + std::to_string(percent) + "% ";
     int bar_width = tw - static_cast<int>(prefix.size()) - 3;
     if (bar_width < 10) bar_width = 10;
 
