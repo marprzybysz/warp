@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WARP Package Manager — prototyp bash
+# WARP — Warp Archive Repository Packager
 # Flow Linux
 
 export LANG=C.UTF-8

@@ -1,4 +1,4 @@
-# WARP Package Manager
+# WARP — Warp Archive Repository Packager
 
 WARP is the native package manager for **Flow Linux** — a minimal LFS-based distribution. It handles installing, removing, and querying packages in the `.wrp` format, as well as raw `.tar.xz` archives.
 
