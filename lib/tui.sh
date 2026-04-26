@@ -57,7 +57,7 @@ done_ok() {
 }
 
 done_err() {
-    echo -e "${RED}BŁĄD: $1${RESET}" >&2
+    echo -e "${RED}ERROR: $1${RESET}" >&2
     exit 1
 }
 

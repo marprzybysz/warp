@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Logika usuwania pakietów
+# Remove logic
 
 remove_pkg() {
     local name="$1"
     local remove_deps="${2:-0}"
 
-    db_exists "$name" || done_err "Pakiet '$name' nie jest zainstalowany"
+    db_exists "$name" || done_err "Package '$name' is not installed"
 
-    log_step "Czytanie listy plików $name..."
+    log_step "Reading file list for $name..."
     local files
     files=$(db_get_files "$name")
 
@@ -21,12 +21,11 @@ remove_pkg() {
             [[ -f "$f" ]] && rm -f "$f"
             count=$(( count + 1 ))
             local pct=$(( count * 100 / total ))
-            progress_bar "$pct" "Usuwanie $name"
+            progress_bar "$pct" "Removing $name"
         done <<< "$files"
 
         clear_progress
 
-        # Usuń puste katalogi po sobie
         while IFS= read -r f; do
             [[ -z "$f" ]] && continue
             local dir
@@ -35,15 +34,14 @@ remove_pkg() {
         done <<< "$files"
     fi
 
-    log_step "Usuwanie plików..." ok
+    log_step "Removing files..." ok
 
-    # Uruchom skrypt REMOVE jeśli istnieje w db
     local remove_script="$WARP_DB/$name/REMOVE"
     if [[ -f "$remove_script" ]]; then
         bash "$remove_script" 2>/dev/null || true
-        log_step "Skrypt deinstalacyjny..." ok
+        log_step "Remove script..." ok
     fi
 
     db_remove "$name"
-    log_step "Rejestr pakietu usunięty..." ok
+    log_step "Package record removed..." ok
 }

@@ -73,12 +73,11 @@ EOF
 
 cmd_install_local() {
     local target="$1"
-    [[ -z "$target" ]] && done_err "Podaj ścieżkę do pliku lub folderu"
-    [[ -e "$target" ]] || done_err "Nie znaleziono: $target"
+    [[ -z "$target" ]] && done_err "Provide a file or folder path"
+    [[ -e "$target" ]] || done_err "Not found: $target"
 
-    # Folder → zbuduj .wrp w tle, potem zainstaluj
     if [[ -d "$target" ]]; then
-        log_step "Wykryto folder — budowanie paczki..."
+        log_step "Directory detected — building package..."
         local old_pwd="$PWD"
         cd /tmp
         build_pkg "$target" <<< ""
@@ -100,7 +99,7 @@ cmd_install_local() {
     case "$fmt" in
         warp)   install_warp_pkg "$target" ;;
         tarxz)  install_tarxz_pkg "$target" ;;
-        unknown) done_err "Nieznany format: $target" ;;
+        unknown) done_err "Unknown format: $target" ;;
     esac
 
     echo ""
@@ -110,7 +109,7 @@ cmd_install_local() {
 cmd_remove() {
     local name="$1"
     local with_deps="${2:-0}"
-    [[ -z "$name" ]] && done_err "Podaj nazwę pakietu"
+    [[ -z "$name" ]] && done_err "Provide a package name"
     remove_pkg "$name" "$with_deps"
     echo ""
     done_ok
@@ -120,30 +119,30 @@ cmd_list() {
     local result
     result=$(db_list)
     if [[ -z "$result" ]]; then
-        echo "Brak zainstalowanych pakietów."
+        echo "No packages installed."
     else
-        printf "%-30s %s\n" "PAKIET" "WERSJA"
-        printf "%-30s %s\n" "------" "------"
+        printf "%-30s %s\n" "PACKAGE" "VERSION"
+        printf "%-30s %s\n" "-------" "-------"
         echo "$result"
     fi
 }
 
 cmd_info() {
     local name="$1"
-    [[ -z "$name" ]] && done_err "Podaj nazwę pakietu"
-    db_exists "$name" || done_err "Pakiet '$name' nie jest zainstalowany"
+    [[ -z "$name" ]] && done_err "Provide a package name"
+    db_exists "$name" || done_err "Package '$name' is not installed"
     db_get_info "$name"
 }
 
 cmd_owner() {
     local file="$1"
-    [[ -z "$file" ]] && done_err "Podaj ścieżkę do pliku"
+    [[ -z "$file" ]] && done_err "Provide a file path"
     local owner
     owner=$(db_owner "$file")
     if [[ -n "$owner" ]]; then
         echo "$file → $owner"
     else
-        echo -e "${YELLOW}Żaden pakiet nie posiada pliku: $file${RESET}"
+        echo -e "${YELLOW}No package owns: $file${RESET}"
         exit 1
     fi
 }
@@ -156,7 +155,7 @@ cmd_sysinfo() {
     echo "DB:      $WARP_DB"
     local count=0
     [[ -d "$WARP_DB" ]] && count=$(find "$WARP_DB" -maxdepth 1 -mindepth 1 -type d | wc -l)
-    echo "Pakiety: $count zainstalowanych"
+    echo "Packages: $count installed"
 }
 
 # --- Parsowanie argumentów ---
