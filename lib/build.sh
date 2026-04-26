@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# warp -cP — budowanie paczki .warp z folderu
+# warp -cP — budowanie paczki .wrp z folderu
 
 build_pkg() {
     local src_dir="$1"
@@ -94,7 +94,7 @@ EOF
     log_step "Zapisano WARPINFO i DEPS..." ok
 
     # Spakuj
-    local output="${name}-${version}-${arch}.warp"
+    local output="${name}-${version}-${arch}.wrp"
     log_step "Pakowanie do $output..."
     tar -cJf "$output" -C "$src_dir" . 2>/dev/null \
         || done_err "Błąd podczas pakowania"

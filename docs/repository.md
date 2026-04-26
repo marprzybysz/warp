@@ -11,8 +11,8 @@ repo.flow.org/core/
 ├── REPOINFO              # repository metadata
 ├── INDEX                 # package list (downloaded by warp --sync)
 └── packages/
-    ├── firefox-92.0-x86_64.warp
-    ├── gtk3-3.24.0-x86_64.warp
+    ├── firefox-92.0-x86_64.wrp
+    ├── gtk3-3.24.0-x86_64.wrp
     └── ...
 ```
 
@@ -38,7 +38,7 @@ One block per package, separated by blank lines:
 version=92.0
 arch=x86_64
 deps=glibc,gtk3,dbus
-file=packages/firefox-92.0-x86_64.warp
+file=packages/firefox-92.0-x86_64.wrp
 sha256=a3f1c29d8e4b1f0c2a7d3e5f6b8c9a1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7
 size=47382614
 
@@ -46,7 +46,7 @@ size=47382614
 version=3.24.0
 arch=x86_64
 deps=glibc
-file=packages/gtk3-3.24.0-x86_64.warp
+file=packages/gtk3-3.24.0-x86_64.wrp
 sha256=b9e2d1f3a4c5e6b7d8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1
 size=8493012
 ```
@@ -68,7 +68,7 @@ arch=x86_64
 EOF
 
 # Move packages in
-cp firefox-92.0-x86_64.warp ~/flow-repo/packages/
+cp firefox-92.0-x86_64.wrp ~/flow-repo/packages/
 
 # Generate INDEX (manual for now — warp --push will automate this)
 cat > ~/flow-repo/INDEX <<EOF
@@ -76,9 +76,9 @@ cat > ~/flow-repo/INDEX <<EOF
 version=92.0
 arch=x86_64
 deps=glibc,gtk3,dbus
-file=packages/firefox-92.0-x86_64.warp
-sha256=$(sha256sum ~/flow-repo/packages/firefox-92.0-x86_64.warp | cut -d' ' -f1)
-size=$(stat -c%s ~/flow-repo/packages/firefox-92.0-x86_64.warp)
+file=packages/firefox-92.0-x86_64.wrp
+sha256=$(sha256sum ~/flow-repo/packages/firefox-92.0-x86_64.wrp | cut -d' ' -f1)
+size=$(stat -c%s ~/flow-repo/packages/firefox-92.0-x86_64.wrp)
 EOF
 
 # Serve it
@@ -132,10 +132,10 @@ Lower priority number = higher priority. If the same package exists in two repos
 warp -cP mypkg-1.0.0/
 
 # Verify
-warp --verify mypkg-1.0.0-x86_64.warp
+warp --verify mypkg-1.0.0-x86_64.wrp
 
 # Push to repo (updates INDEX and uploads file)
-warp --push mypkg-1.0.0-x86_64.warp
+warp --push mypkg-1.0.0-x86_64.wrp
 ```
 
 `warp --push` requires write access to the repo server. The exact method (SSH, HTTP PUT, rsync) is configured in `/etc/warp/warp.conf`.

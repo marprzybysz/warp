@@ -1,6 +1,6 @@
 # WARP Package Manager
 
-WARP is the native package manager for **Flow Linux** — a minimal LFS-based distribution. It handles installing, removing, and querying packages in the `.warp` format, as well as raw `.tar.xz` archives.
+WARP is the native package manager for **Flow Linux** — a minimal LFS-based distribution. It handles installing, removing, and querying packages in the `.wrp` format, as well as raw `.tar.xz` archives.
 
 ---
 
@@ -18,7 +18,7 @@ WARP is the native package manager for **Flow Linux** — a minimal LFS-based di
 
 ```bash
 # Install a package from a file
-warp -gP firefox-92.0-x86_64.warp
+warp -gP firefox-92.0-x86_64.wrp
 
 # Install a raw archive
 warp -gP mytool-1.0.tar.xz
@@ -37,10 +37,10 @@ warp -Qi firefox
 
 ## Package Format
 
-WARP uses the `.warp` format — a renamed `tar.xz` archive with a defined internal structure:
+WARP uses the `.wrp` format — a renamed `tar.xz` archive with a defined internal structure:
 
 ```
-firefox.warp
+firefox.wrp
 ├── WARPINFO     # metadata
 ├── DEPS         # dependency list
 ├── INSTALL      # pre/post install script (optional)

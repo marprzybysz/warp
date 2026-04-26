@@ -41,7 +41,7 @@ summary=true
 # Directory for downloaded packages and repo index
 dir=/var/cache/warp
 
-# How many days to keep cached .warp files before auto-cleanup
+# How many days to keep cached .wrp files before auto-cleanup
 keep_days=7
 ```
 
@@ -60,7 +60,7 @@ Example:
 
 ```bash
 # Use a test database without touching the system one
-WARP_DB=/tmp/test-db warp -gP mypkg.warp
+WARP_DB=/tmp/test-db warp -gP mypkg.wrp
 ```
 
 ---

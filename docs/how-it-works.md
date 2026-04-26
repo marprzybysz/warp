@@ -17,7 +17,7 @@ WARP is written in C++ (with a Bash prototype for development). It operates enti
 │      /var/lib/warp/db/          │
 ├─────────────────────────────────┤
 │        libarchive               │
-│   (.warp and .tar.xz I/O)       │
+│   (.wrp and .tar.xz I/O)       │
 └─────────────────────────────────┘
 ```
 
@@ -43,16 +43,16 @@ Every installed package gets a record in `/var/lib/warp/db/<name>/`:
 When you run `warp -gP <file>`, WARP determines the format automatically:
 
 ```
-Is extension .warp?
-  └─ Yes → full .warp mode
+Is extension .wrp?
+  └─ Yes → full .wrp mode
   └─ No  → peek inside the archive for WARPINFO
-             ├─ Found → treat as .warp
+             ├─ Found → treat as .wrp
              └─ Not found → raw .tar.xz mode
 ```
 
 ---
 
-## Installation Flow (.warp)
+## Installation Flow (.wrp)
 
 ```
 1. Extract archive to /tmp/warp.<pid>/

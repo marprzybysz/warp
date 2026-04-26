@@ -5,9 +5,9 @@
 | Command | Description |
 |---|---|
 | `warp -G <pkg>` | Install package from configured repository |
-| `warp -gP <file.warp>` | Install from a local `.warp` file |
+| `warp -gP <file.wrp>` | Install from a local `.wrp` file |
 | `warp -gP <file.tar.xz>` | Install from a raw `.tar.xz` archive |
-| `warp -gP <folder/>` | Install from a local folder (auto-builds `.warp`) |
+| `warp -gP <folder/>` | Install from a local folder (auto-builds `.wrp`) |
 | `warp -D <pkg>` | Remove a package |
 | `warp -DD <pkg>` | Remove a package and its dependencies |
 | `warp -DC <pkg>` | Remove cached files for a package |
@@ -37,8 +37,8 @@
 
 | Command | Description |
 |---|---|
-| `warp -cP <folder>` | Build a `.warp` package from a folder |
-| `warp --verify <file>` | Verify checksum of a `.warp` file |
+| `warp -cP <folder>` | Build a `.wrp` package from a folder |
+| `warp --verify <file>` | Verify checksum of a `.wrp` file |
 | `warp --push <file>` | Upload package to configured repository |
 
 ## Repositories
@@ -76,7 +76,7 @@
 Append `-q` to any command to suppress all output except the final result:
 
 ```bash
-warp -gP firefox.warp -q
+warp -gP firefox.wrp -q
 # output: Gotowe
 ```
 

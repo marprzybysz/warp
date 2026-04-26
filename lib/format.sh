@@ -7,7 +7,7 @@ detect_format() {
     [[ -f "$file" ]] || { echo "unknown"; return 1; }
 
     case "$file" in
-        *.warp) echo "warp"; return 0 ;;
+        *.wrp) echo "warp"; return 0 ;;
     esac
 
     # .tar.xz — sprawdź czy ma WARPINFO w środku
@@ -43,7 +43,7 @@ name_from_file() {
     local base
     base=$(basename "$file")
     # firefox-92.0-x86_64.tar.xz → firefox
-    base="${base%.warp}"
+    base="${base%.wrp}"
     base="${base%.tar.xz}"
     base="${base%.tar.gz}"
     base="${base%.tar.bz2}"
@@ -57,7 +57,7 @@ version_from_file() {
     local file="$1"
     local base
     base=$(basename "$file")
-    base="${base%.warp}"
+    base="${base%.wrp}"
     base="${base%.tar.xz}"
     base="${base%.tar.gz}"
     base="${base%.tar.bz2}"

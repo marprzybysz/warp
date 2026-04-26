@@ -184,7 +184,7 @@ void create_pkg(const fs::path& src_dir_in) {
     tui::log_step("Saved WARPINFO and DEPS...", "ok");
 
     // Pack
-    std::string output = name + "-" + version + "-" + arch + ".warp";
+    std::string output = name + "-" + version + "-" + arch + ".wrp";
     tui::log_step("Packing " + output + "...");
     pack_warp(src_dir, output);
     tui::log_step("Package ready: " + output, "ok");

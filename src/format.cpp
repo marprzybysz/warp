@@ -38,7 +38,7 @@ Type detect(const fs::path& file) {
     if (!fs::exists(file)) return Type::Unknown;
 
     std::string ext = file.extension().string();
-    if (ext == ".warp") return Type::Warp;
+    if (ext == ".wrp") return Type::Warp;
 
     // For .tar.xz / .tar.gz / .tar.bz2 — peek inside for WARPINFO
     std::string fname = file.filename().string();

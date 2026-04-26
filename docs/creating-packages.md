@@ -2,10 +2,10 @@
 
 ## Package Structure
 
-A `.warp` file is a `tar.xz` archive with the following layout:
+A `.wrp` file is a `tar.xz` archive with the following layout:
 
 ```
-mypkg-1.0.0-x86_64.warp
+mypkg-1.0.0-x86_64.wrp
 ├── WARPINFO          # required — package metadata
 ├── DEPS              # required — dependency list (can be empty)
 ├── INSTALL           # optional — runs before file copy
@@ -120,7 +120,7 @@ echo "glibc" > mypkg-1.0.0/DEPS
 2. Pack it:
 
 ```bash
-tar -cJf mypkg-1.0.0-x86_64.warp -C mypkg-1.0.0 .
+tar -cJf mypkg-1.0.0-x86_64.wrp -C mypkg-1.0.0 .
 ```
 
 ### Method 2 — warp -cP (recommended)
@@ -133,7 +133,7 @@ WARP will:
 - Auto-detect dependencies using `ldd` on every binary in `files/`
 - Write `DEPS` automatically
 - Create `WARPINFO` from a prompt (or from an existing one)
-- Pack everything into `<name>-<version>-<arch>.warp`
+- Pack everything into `<name>-<version>-<arch>.wrp`
 
 ---
 
@@ -155,14 +155,14 @@ The detected package names are written to `DEPS`. You can edit the file manually
 ## Naming Convention
 
 ```
-<name>-<version>-<arch>.warp
+<name>-<version>-<arch>.wrp
 ```
 
 Examples:
 ```
-firefox-92.0-x86_64.warp
-gtk3-3.24.0-x86_64.warp
-mylib-1.2.3-any.warp        # arch=any for scripts/data
+firefox-92.0-x86_64.wrp
+gtk3-3.24.0-x86_64.wrp
+mylib-1.2.3-any.wrp        # arch=any for scripts/data
 ```
 
 ---
@@ -170,7 +170,7 @@ mylib-1.2.3-any.warp        # arch=any for scripts/data
 ## Verifying a Package
 
 ```bash
-warp --verify firefox-92.0-x86_64.warp
+warp --verify firefox-92.0-x86_64.wrp
 ```
 
 Checks:

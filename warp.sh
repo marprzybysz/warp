@@ -26,7 +26,7 @@ Usage: warp [options] [package/file]
 
 Package management:
   -G  <pkg>          Install from repository
-  -gP <file|folder>  Install locally (.warp or .tar.xz)
+  -gP <file|folder>  Install locally (.wrp or .tar.xz)
   -D  <pkg>          Remove package
   -DD <pkg>          Remove package and its dependencies
   -DC <pkg>          Remove cached files for package
@@ -47,8 +47,8 @@ Query:
   -ls <query>        Search repository for packages
 
 Building:
-  -cP <folder>       Build a .warp package from folder
-  --verify <file>    Verify checksum of a .warp file
+  -cP <folder>       Build a .wrp package from folder
+  --verify <file>    Verify checksum of a .wrp file
   --push <file>      Upload package to repository
 
 Repositories:
