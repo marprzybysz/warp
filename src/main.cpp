@@ -67,6 +67,29 @@ static void cmd_install_local(const std::string& target) {
     if (target.empty())        tui::done_err("Provide a file or folder path");
     if (!fs::exists(target))   tui::done_err("Not found: " + target);
 
+    // Folder → build .wrp on the fly, then install
+    if (fs::is_directory(target)) {
+        tui::log_step("Directory detected — building package...");
+        fs::path tmp_wrp = fs::temp_directory_path() / ("warp-install." + std::to_string(getpid()));
+        fs::current_path(fs::temp_directory_path());
+        build::create_pkg(target);
+
+        // Find the generated .wrp
+        fs::path wrp_file;
+        for (const auto& e : fs::directory_iterator(fs::temp_directory_path())) {
+            if (e.path().extension() == ".wrp") { wrp_file = e.path(); break; }
+        }
+        if (wrp_file.empty()) tui::done_err("Failed to build package from folder");
+
+        tui::println("");
+        install::from_warp(wrp_file);
+        fs::remove(wrp_file);
+        fs::remove(fs::path(wrp_file.string() + ".sha256"));
+        tui::println("");
+        tui::done_ok();
+        return;
+    }
+
     auto fmt = format::detect(target);
     switch (fmt) {
         case format::Type::Warp:   install::from_warp(target);   break;

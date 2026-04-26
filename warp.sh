@@ -76,6 +76,24 @@ cmd_install_local() {
     [[ -z "$target" ]] && done_err "Podaj ścieżkę do pliku lub folderu"
     [[ -e "$target" ]] || done_err "Nie znaleziono: $target"
 
+    # Folder → zbuduj .wrp w tle, potem zainstaluj
+    if [[ -d "$target" ]]; then
+        log_step "Wykryto folder — budowanie paczki..."
+        local old_pwd="$PWD"
+        cd /tmp
+        build_pkg "$target" <<< ""
+        local wrp_file
+        wrp_file=$(ls -t /tmp/*.wrp 2>/dev/null | head -1)
+        cd "$old_pwd"
+        [[ -z "$wrp_file" ]] && done_err "Nie udało się zbudować paczki z folderu"
+        echo ""
+        install_warp_pkg "$wrp_file"
+        rm -f "$wrp_file" "${wrp_file}.sha256"
+        echo ""
+        done_ok
+        return
+    fi
+
     local fmt
     fmt=$(detect_format "$target")
 
