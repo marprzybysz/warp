@@ -26,7 +26,7 @@ Usage: warp [options] [package/file]
 
 Package management:
   -G  <pkg>          Install from repository
-  -gP <file|folder>  Install locally (.wrp or .tar.xz)
+  -i  <file|folder>  Install locally (.wrp or .tar.xz)
   -D  <pkg>          Remove package
   -DD <pkg>          Remove package and its dependencies
   -DC <pkg>          Remove cached files for package
@@ -34,16 +34,13 @@ Package management:
 
 Updates:
   --sync             Synchronize repository index
-  -U  <pkg>          Update a specific package
-  -AU                Update all installed packages
+  -U                 Upgrade all installed packages
   -LU                List available updates
 
 Query:
-  -Q                 List all installed packages
-  -Qi <pkg>          Show detailed package info
-  -Qe                List explicitly installed packages
-  -Qd                List dependency-only packages
-  -Qo <file>         Which package owns a file?
+  -A                 List all installed packages
+  -s  <pkg>          Show detailed package info
+  -S  <file>         Which package owns a file?
   -ls <query>        Search repository for packages
 
 Building:
@@ -168,14 +165,16 @@ for arg in "$@"; do
 done
 
 case "$1" in
-    -gP)     cmd_install_local "$2" ;;
+    -i)      cmd_install_local "$2" ;;
     -G)      repo_install "$2" ;;
     -D)      cmd_remove "$2" 0 ;;
     -DD)     cmd_remove "$2" 1 ;;
-    -Q)      cmd_list ;;
-    -Qi)     cmd_info "$2" ;;
-    -Qo)     cmd_owner "$2" ;;
+    -A)      cmd_list ;;
+    -s)      cmd_info "$2" ;;
+    -S)      cmd_owner "$2" ;;
     -ls)     repo_search "$2" ;;
+    -U)      done_err "Upgrade not yet implemented" ;;
+    -LU)     done_err "List updates not yet implemented" ;;
     -cP)     build_pkg "$2" && echo "" && done_ok ;;
     --sync)  repo_sync && echo "" && done_ok ;;
     -info)   cmd_sysinfo ;;

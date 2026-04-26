@@ -5,9 +5,9 @@
 | Command | Description |
 |---|---|
 | `warp -G <pkg>` | Install package from configured repository |
-| `warp -gP <file.wrp>` | Install from a local `.wrp` file |
-| `warp -gP <file.tar.xz>` | Install from a raw `.tar.xz` archive |
-| `warp -gP <folder/>` | Install from a local folder (auto-builds `.wrp`) |
+| `warp -i <file.wrp>` | Install from a local `.wrp` file |
+| `warp -i <file.tar.xz>` | Install from a raw `.tar.xz` archive |
+| `warp -i <folder/>` | Install from a local folder (auto-builds `.wrp`) |
 | `warp -D <pkg>` | Remove a package |
 | `warp -DD <pkg>` | Remove a package and its dependencies |
 | `warp -DC <pkg>` | Remove cached files for a package |
@@ -19,7 +19,7 @@
 |---|---|
 | `warp --sync` | Synchronize repository index |
 | `warp -U <pkg>` | Update a specific package |
-| `warp -AU` | Update all installed packages |
+| `warp -U` | Update all installed packages |
 | `warp -LU` | List available updates |
 
 ## Query
@@ -27,10 +27,10 @@
 | Command | Description |
 |---|---|
 | `warp -Q` | List all installed packages |
-| `warp -Qi <pkg>` | Show detailed info about an installed package |
+| `warp -s <pkg>` | Show detailed info about an installed package |
 | `warp -Qe` | List explicitly installed packages (not pulled as deps) |
 | `warp -Qd` | List packages installed as dependencies only |
-| `warp -Qo <file>` | Show which package owns a given file |
+| `warp -S <file>` | Show which package owns a given file |
 | `warp -ls <query>` | Search repository for packages |
 
 ## Building Packages
@@ -76,7 +76,7 @@
 Append `-q` to any command to suppress all output except the final result:
 
 ```bash
-warp -gP firefox.wrp -q
+warp -i firefox.wrp -q
 # output: Gotowe
 ```
 

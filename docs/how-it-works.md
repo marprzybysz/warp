@@ -40,7 +40,7 @@ Every installed package gets a record in `/var/lib/warp/db/<name>/`:
 
 ## Format Detection
 
-When you run `warp -gP <file>`, WARP determines the format automatically:
+When you run `warp -i <file>`, WARP determines the format automatically:
 
 ```
 Is extension .wrp?

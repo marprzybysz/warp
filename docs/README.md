@@ -18,19 +18,19 @@ WARP is the native package manager for **Flow Linux** — a minimal LFS-based di
 
 ```bash
 # Install a package from a file
-warp -gP firefox-92.0-x86_64.wrp
+warp -i firefox-92.0-x86_64.wrp
 
 # Install a raw archive
-warp -gP mytool-1.0.tar.xz
+warp -i mytool-1.0.tar.xz
 
 # Remove a package
 warp -D firefox
 
 # List installed packages
-warp -Q
+warp -A
 
 # Show package info
-warp -Qi firefox
+warp -s firefox
 ```
 
 ---

@@ -18,7 +18,7 @@ static void usage() {
 
 Package management:
   -G  <pkg>          Install from repository
-  -gP <file|folder>  Install locally (.wrp or .tar.xz)
+  -i  <file|folder>  Install locally (.wrp or .tar.xz)
   -D  <pkg>          Remove package
   -DD <pkg>          Remove package and its dependencies
   -DC <pkg>          Remove cached files for package
@@ -26,16 +26,13 @@ Package management:
 
 Updates:
   --sync             Synchronize repository index
-  -U  <pkg>          Update a specific package
-  -AU                Update all installed packages
+  -U                 Upgrade all installed packages
   -LU                List available updates
 
 Query:
-  -Q                 List all installed packages
-  -Qi <pkg>          Show detailed package info
-  -Qe                List explicitly installed packages
-  -Qd                List dependency-only packages
-  -Qo <file>         Which package owns a file?
+  -A                 List all installed packages
+  -s  <pkg>          Show detailed package info
+  -S  <file>         Which package owns a file?
   -ls <query>        Search repository for packages
 
 Building:
@@ -167,14 +164,16 @@ int main(int argc, char* argv[]) {
 
     std::string cmd = argv[1];
 
-    if      (cmd == "-gP")              { cmd_install_local(argc > 2 ? argv[2] : ""); }
+    if      (cmd == "-i")               { cmd_install_local(argc > 2 ? argv[2] : ""); }
     else if (cmd == "-G")               { repo::install(argc > 2 ? argv[2] : ""); tui::println(""); tui::done_ok(); }
     else if (cmd == "-D")               { cmd_remove(argc > 2 ? argv[2] : "", false); }
     else if (cmd == "-DD")              { cmd_remove(argc > 2 ? argv[2] : "", true); }
-    else if (cmd == "-Q")               { cmd_list(); }
-    else if (cmd == "-Qi")              { cmd_info(argc > 2 ? argv[2] : ""); }
-    else if (cmd == "-Qo")              { cmd_owner(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "-A")               { cmd_list(); }
+    else if (cmd == "-s")               { cmd_info(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "-S")               { cmd_owner(argc > 2 ? argv[2] : ""); }
     else if (cmd == "-ls")              { repo::search(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "-U")               { tui::done_err("Upgrade not yet implemented"); }
+    else if (cmd == "-LU")              { tui::done_err("List updates not yet implemented"); }
     else if (cmd == "-cP")              { build::create_pkg(argc > 2 ? argv[2] : ""); tui::println(""); tui::done_ok(); }
     else if (cmd == "--sync")           { repo::sync(); tui::println(""); tui::done_ok(); }
     else if (cmd == "-info")            { cmd_sysinfo(); }

@@ -60,7 +60,7 @@ Example:
 
 ```bash
 # Use a test database without touching the system one
-WARP_DB=/tmp/test-db warp -gP mypkg.wrp
+WARP_DB=/tmp/test-db warp -i mypkg.wrp
 ```
 
 ---
