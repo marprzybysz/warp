@@ -32,17 +32,19 @@ progress_bar() {
     local action="$2"
     local term_width
     term_width=$(tput cols 2>/dev/null || echo 80)
-    local prefix
-    prefix=$(printf "%3d%% %-18s " "$percent" "$action")
-    local bar_width=$(( term_width - ${#prefix} - 1 ))
+    # Format: "Progress:75% [######          ]"
+    local prefix="Progress:${percent}% "
+    local bar_width=$(( term_width - ${#prefix} - 3 ))
+    [[ $bar_width -lt 10 ]] && bar_width=10
     local filled=$(( percent * bar_width / 100 ))
     [[ $filled -lt 0 ]] && filled=0
     [[ $filled -gt $bar_width ]] && filled=$bar_width
-    local bar
-    bar=$(printf '%0.s#' $(seq 1 $filled) 2>/dev/null || printf '%.0s#' {1..$filled})
-    local empty
-    empty=$(printf '%*s' $(( bar_width - filled )) "")
-    printf "\r${BG_MAGENTA}${FG_BLACK}%s%s${RESET}%s" "$prefix" "$bar" "$empty"
+    local bar=""
+    local i
+    for (( i=0; i<filled; i++ )); do bar+="#"; done
+    local empty=""
+    for (( i=filled; i<bar_width; i++ )); do empty+=" "; done
+    printf "\r%s[%s%s]" "$prefix" "$bar" "$empty"
 }
 
 clear_progress() {

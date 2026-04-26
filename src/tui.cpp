@@ -45,31 +45,22 @@ void log_step(const std::string& msg, const std::string& status) {
         std::cout << msg << "\n";
 }
 
-void progress_bar(int percent, const std::string& action) {
+void progress_bar(int percent, const std::string& /*action*/) {
     if (quiet || !use_progress) return;
     if (percent < 0)   percent = 0;
     if (percent > 100) percent = 100;
 
     int tw = term_width();
 
-    std::ostringstream prefix_ss;
-    prefix_ss << std::setw(3) << percent << "% "
-              << std::left << std::setw(18) << action << " ";
-    std::string prefix = prefix_ss.str();
-
-    int bar_width = tw - static_cast<int>(prefix.size()) - 1;
-    if (bar_width < 0) bar_width = 0;
+    std::string prefix = "Progress:" + std::to_string(percent) + "% ";
+    int bar_width = tw - static_cast<int>(prefix.size()) - 3;
+    if (bar_width < 10) bar_width = 10;
 
     int filled = percent * bar_width / 100;
     std::string bar(filled, '#');
     std::string empty(bar_width - filled, ' ');
 
-    std::cout << "\r"
-              << c("\033[45m") << c("\033[30m")
-              << prefix << bar
-              << c("\033[0m")
-              << empty
-              << std::flush;
+    std::cout << "\r" << prefix << "[" << bar << empty << "]" << std::flush;
 }
 
 void clear_progress() {
