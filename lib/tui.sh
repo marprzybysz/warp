@@ -33,7 +33,7 @@ progress_bar() {
     local term_width
     term_width=$(tput cols 2>/dev/null || echo 80)
     # Format: "Progress:75% [######          ]"
-    local prefix="Progress:${percent}% "
+    local prefix="Progress: ${percent}% "
     local bar_width=$(( term_width - ${#prefix} - 3 ))
     [[ $bar_width -lt 10 ]] && bar_width=10
     local filled=$(( percent * bar_width / 100 ))
