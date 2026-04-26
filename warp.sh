@@ -15,6 +15,8 @@ source "$SCRIPT_DIR/lib/db.sh"
 source "$SCRIPT_DIR/lib/format.sh"
 source "$SCRIPT_DIR/lib/install.sh"
 source "$SCRIPT_DIR/lib/remove.sh"
+source "$SCRIPT_DIR/lib/build.sh"
+source "$SCRIPT_DIR/lib/repo.sh"
 
 config_load
 
@@ -149,15 +151,18 @@ for arg in "$@"; do
 done
 
 case "$1" in
-    -gP)  cmd_install_local "$2" ;;
-    -G)   done_err "Instalacja z repo nie jest jeszcze zaimplementowana (prototyp)" ;;
-    -D)   cmd_remove "$2" 0 ;;
-    -DD)  cmd_remove "$2" 1 ;;
-    -Q)   cmd_list ;;
-    -Qi)  cmd_info "$2" ;;
-    -Qo)  cmd_owner "$2" ;;
-    -info) cmd_sysinfo ;;
+    -gP)     cmd_install_local "$2" ;;
+    -G)      repo_install "$2" ;;
+    -D)      cmd_remove "$2" 0 ;;
+    -DD)     cmd_remove "$2" 1 ;;
+    -Q)      cmd_list ;;
+    -Qi)     cmd_info "$2" ;;
+    -Qo)     cmd_owner "$2" ;;
+    -ls)     repo_search "$2" ;;
+    -cP)     build_pkg "$2" && echo "" && done_ok ;;
+    --sync)  repo_sync && echo "" && done_ok ;;
+    -info)   cmd_sysinfo ;;
     -help|--help|-h) usage ;;
-    -q)   usage ;;
-    *)    echo -e "${RED}Nieznana opcja: $1${RESET}"; usage; exit 1 ;;
+    -q)      usage ;;
+    *)       echo -e "${RED}Unknown option: $1${RESET}"; usage; exit 1 ;;
 esac

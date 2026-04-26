@@ -4,6 +4,8 @@
 #include "format.h"
 #include "install.h"
 #include "remove.h"
+#include "build.h"
+#include "repo.h"
 #include <iostream>
 #include <iomanip>
 #include <clocale>
@@ -142,16 +144,19 @@ int main(int argc, char* argv[]) {
 
     std::string cmd = argv[1];
 
-    if (cmd == "-gP")   { cmd_install_local(argc > 2 ? argv[2] : ""); }
-    else if (cmd == "-G")    { tui::done_err("Repo install not yet implemented (prototype)"); }
-    else if (cmd == "-D")    { cmd_remove(argc > 2 ? argv[2] : "", false); }
-    else if (cmd == "-DD")   { cmd_remove(argc > 2 ? argv[2] : "", true);  }
-    else if (cmd == "-Q")    { cmd_list(); }
-    else if (cmd == "-Qi")   { cmd_info(argc > 2 ? argv[2] : ""); }
-    else if (cmd == "-Qo")   { cmd_owner(argc > 2 ? argv[2] : ""); }
-    else if (cmd == "-info") { cmd_sysinfo(); }
+    if      (cmd == "-gP")              { cmd_install_local(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "-G")               { repo::install(argc > 2 ? argv[2] : ""); tui::println(""); tui::done_ok(); }
+    else if (cmd == "-D")               { cmd_remove(argc > 2 ? argv[2] : "", false); }
+    else if (cmd == "-DD")              { cmd_remove(argc > 2 ? argv[2] : "", true); }
+    else if (cmd == "-Q")               { cmd_list(); }
+    else if (cmd == "-Qi")              { cmd_info(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "-Qo")              { cmd_owner(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "-ls")              { repo::search(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "-cP")              { build::create_pkg(argc > 2 ? argv[2] : ""); tui::println(""); tui::done_ok(); }
+    else if (cmd == "--sync")           { repo::sync(); tui::println(""); tui::done_ok(); }
+    else if (cmd == "-info")            { cmd_sysinfo(); }
     else if (cmd == "-help" || cmd == "--help" || cmd == "-h") { usage(); }
-    else if (cmd == "-q")    { usage(); }
+    else if (cmd == "-q")               { usage(); }
     else {
         std::cerr << "Unknown option: " << cmd << "\n";
         usage();

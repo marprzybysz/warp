@@ -16,6 +16,8 @@ add_executable(warp
     src/format.cpp
     src/install.cpp
     src/remove.cpp
+    src/build.cpp
+    src/repo.cpp
 )
 
 target_include_directories(warp PRIVATE src ${LIBARCHIVE_INCLUDE_DIRS})
