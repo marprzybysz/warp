@@ -9,6 +9,7 @@
 #include <sstream>
 #include <filesystem>
 #include <iomanip>
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <curl/curl.h>
@@ -17,63 +18,101 @@ namespace repo {
 
 namespace fs = std::filesystem;
 
-static fs::path index_dir()  { return fs::path(config::cfg.cache_dir) / "index"; }
+static fs::path repos_dir()  { return fs::path("/etc/warp/repos.d"); }
 static fs::path pkg_cache()  { return fs::path(config::cfg.cache_dir) / "packages"; }
-static fs::path index_file() { return index_dir() / "INDEX"; }
+static fs::path index_root() { return fs::path(config::cfg.cache_dir) / "index"; }
 
-// libcurl write callback — writes data to a file
+struct RepoEntry {
+    int         n;
+    std::string url;
+};
+
+// Load all repos from /etc/warp/repos.d/<n>.conf
+static std::vector<RepoEntry> load_repos() {
+    std::vector<RepoEntry> repos;
+
+    if (!fs::is_directory(repos_dir())) {
+        // Fallback to single repo from warp.conf
+        repos.push_back({1, config::cfg.repo});
+        return repos;
+    }
+
+    std::vector<fs::path> files;
+    for (const auto& e : fs::directory_iterator(repos_dir()))
+        if (e.path().extension() == ".conf")
+            files.push_back(e.path());
+    std::sort(files.begin(), files.end());
+
+    for (const auto& f : files) {
+        std::ifstream in(f);
+        std::string line;
+        while (std::getline(in, line)) {
+            if (line.rfind("url=", 0) == 0) {
+                std::string stem = f.stem().string();
+                int n = 1;
+                try { n = std::stoi(stem); } catch (...) {}
+                repos.push_back({n, line.substr(4)});
+                break;
+            }
+        }
+    }
+
+    if (repos.empty())
+        repos.push_back({1, config::cfg.repo});
+
+    return repos;
+}
+
+static fs::path index_for(int n) {
+    return index_root() / std::to_string(n) / "INDEX";
+}
+
+// libcurl write callback
 static size_t write_file(void* ptr, size_t size, size_t nmemb, void* stream) {
     return fwrite(ptr, size, nmemb, static_cast<FILE*>(stream));
 }
 
-// libcurl progress callback — updates tui progress bar
-static int progress_cb(void* /*client*/,
-                        curl_off_t dltotal, curl_off_t dlnow,
-                        curl_off_t /*ultotal*/, curl_off_t /*ulnow*/) {
-    if (dltotal > 0) {
-        int pct = static_cast<int>(dlnow * 100 / dltotal);
-        tui::progress_bar(pct);
-    }
+// libcurl progress callback
+static int progress_cb(void*, curl_off_t dltotal, curl_off_t dlnow, curl_off_t, curl_off_t) {
+    if (dltotal > 0)
+        tui::progress_bar(static_cast<int>(dlnow * 100 / dltotal));
     return 0;
 }
 
 static bool curl_download(const std::string& url, const fs::path& dest) {
     fs::create_directories(dest.parent_path());
-
     FILE* f = fopen(dest.c_str(), "wb");
     if (!f) return false;
 
     CURL* curl = curl_easy_init();
     if (!curl) { fclose(f); return false; }
 
-    curl_easy_setopt(curl, CURLOPT_URL,            url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,  write_file);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA,      f);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT,        static_cast<long>(config::cfg.timeout));
-    curl_easy_setopt(curl, CURLOPT_FAILONERROR,    1L);
-    curl_easy_setopt(curl, CURLOPT_NOPROGRESS,     0L);
+    curl_easy_setopt(curl, CURLOPT_URL,              url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,    write_file);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA,        f);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION,   1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT,          static_cast<long>(config::cfg.timeout));
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR,      1L);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS,       0L);
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_cb);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT,      "warp/0.1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT,        "warp/0.1.0");
 
     CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
     fclose(f);
 
-    if (res != CURLE_OK) {
-        fs::remove(dest);
-        return false;
-    }
+    if (res != CURLE_OK) { fs::remove(dest); return false; }
     return true;
 }
 
-static std::string index_get(const std::string& pkg, const std::string& field) {
-    std::ifstream f(index_file());
+// Search field in a specific INDEX file
+static std::string index_get_file(const fs::path& idx, const std::string& pkg, const std::string& field) {
+    std::ifstream f(idx);
     if (!f.is_open()) return "";
     bool in_pkg = false;
     std::string line, section = "[" + pkg + "]";
     while (std::getline(f, line)) {
-        if (line == section) { in_pkg = true; continue; }
+        if (line == section)         { in_pkg = true; continue; }
         if (in_pkg) {
             if (!line.empty() && line.front() == '[') break;
             if (line.rfind(field + "=", 0) == 0)
@@ -83,7 +122,20 @@ static std::string index_get(const std::string& pkg, const std::string& field) {
     return "";
 }
 
-static std::string sha256sum(const fs::path& file) {
+// Search all repos in order, return {value, repo_entry}
+static std::pair<std::string, RepoEntry> index_get_all(
+        const std::vector<RepoEntry>& repos,
+        const std::string& pkg, const std::string& field) {
+    for (const auto& r : repos) {
+        fs::path idx = index_for(r.n);
+        if (!fs::exists(idx)) continue;
+        std::string val = index_get_file(idx, pkg, field);
+        if (!val.empty()) return {val, r};
+    }
+    return {"", {}};
+}
+
+static std::string sha256sum_file(const fs::path& file) {
     std::array<char, 128> buf{};
     FILE* p = popen(("sha256sum " + file.string() + " | cut -d' ' -f1").c_str(), "r");
     if (!p) return "";
@@ -94,32 +146,36 @@ static std::string sha256sum(const fs::path& file) {
     return s;
 }
 
+// ─── Public API ──────────────────────────────────────────────────────────────
+
 void sync() {
-    std::string url = config::cfg.repo + "/INDEX";
-    tui::log_step("Syncing from " + config::cfg.repo + "...");
-    fs::create_directories(index_dir());
+    auto repos = load_repos();
+    for (const auto& r : repos) {
+        tui::log_step("Syncing " + r.url + "...");
+        fs::path dest = index_for(r.n);
+        fs::create_directories(dest.parent_path());
 
-    if (!curl_download(url, index_file()))
-        tui::done_err("Cannot fetch INDEX from " + url);
-    tui::clear_progress();
+        if (!curl_download(r.url + "/INDEX", dest))
+            tui::done_err("Cannot fetch INDEX from " + r.url);
+        tui::clear_progress();
 
-    std::ifstream f(index_file());
-    int count = 0;
-    std::string line;
-    while (std::getline(f, line))
-        if (!line.empty() && line.front() == '[') ++count;
+        std::ifstream f(dest);
+        int count = 0;
+        std::string line;
+        while (std::getline(f, line))
+            if (!line.empty() && line.front() == '[') ++count;
 
-    tui::log_step("Fetched INDEX (" + std::to_string(count) + " packages)...", "ok");
+        tui::log_step("Fetched INDEX (" + std::to_string(count) + " packages)...", "ok");
+    }
 }
 
 void install(const std::string& pkg) {
     if (pkg.empty()) tui::done_err("Provide a package name");
-    if (!fs::exists(index_file()))
-        tui::done_err("INDEX not found — run: warp --sync");
 
-    std::string version = index_get(pkg, "version");
+    auto repos = load_repos();
+    auto [version, repo_entry] = index_get_all(repos, pkg, "version");
     if (version.empty())
-        tui::done_err("Package '" + pkg + "' not found in repository");
+        tui::done_err("Package '" + pkg + "' not found — run: warp --sync");
 
     tui::log_step("Found: " + pkg + " " + version, "ok");
 
@@ -128,15 +184,16 @@ void install(const std::string& pkg) {
         return;
     }
 
-    std::string file_rel = index_get(pkg, "file");
-    std::string expected_sha = index_get(pkg, "sha256");
+    std::string file_rel    = index_get_file(index_for(repo_entry.n), pkg, "file");
+    std::string expected_sha = index_get_file(index_for(repo_entry.n), pkg, "sha256");
+
     if (file_rel.empty())
         tui::done_err("No file entry for '" + pkg + "' in INDEX");
 
     fs::path cached = pkg_cache() / fs::path(file_rel).filename();
 
     if (!fs::exists(cached)) {
-        std::string url = config::cfg.repo + "/" + file_rel;
+        std::string url = repo_entry.url + "/" + file_rel;
         tui::log_step("Downloading " + pkg + " " + version + "...");
         fs::create_directories(pkg_cache());
 
@@ -151,8 +208,7 @@ void install(const std::string& pkg) {
 
     if (!expected_sha.empty()) {
         tui::log_step("Verifying checksum...");
-        std::string actual = sha256sum(cached);
-        if (actual != expected_sha) {
+        if (sha256sum_file(cached) != expected_sha) {
             fs::remove(cached);
             tui::done_err("SHA256 mismatch — corrupted file");
         }
@@ -163,15 +219,18 @@ void install(const std::string& pkg) {
 }
 
 void list_updates() {
-    if (!fs::exists(index_file()))
-        tui::done_err("INDEX not found — run: warp --sync");
+    auto repos = load_repos();
+    bool any_index = false;
+    for (const auto& r : repos)
+        if (fs::exists(index_for(r.n))) { any_index = true; break; }
+    if (!any_index) tui::done_err("No INDEX found — run: warp --sync");
 
     struct Update { std::string name, installed, available; };
     std::vector<Update> updates;
 
     for (const auto& pkg : db::list_names()) {
         std::string inst  = db::get_version(pkg);
-        std::string avail = index_get(pkg, "version");
+        auto [avail, _]   = index_get_all(repos, pkg, "version");
         if (avail.empty() || avail == inst) continue;
         updates.push_back({pkg, inst, avail});
     }
@@ -187,14 +246,14 @@ void list_updates() {
 }
 
 void upgrade() {
-    if (!fs::exists(index_file()))
-        tui::done_err("INDEX not found — run: warp --sync");
-
+    auto repos = load_repos();
     int upgraded = 0;
+
     for (const auto& pkg : db::list_names()) {
-        std::string inst  = db::get_version(pkg);
-        std::string avail = index_get(pkg, "version");
+        std::string inst = db::get_version(pkg);
+        auto [avail, _]  = index_get_all(repos, pkg, "version");
         if (avail.empty() || avail == inst) continue;
+
         tui::log_step("Upgrading " + pkg + ": " + inst + " → " + avail + "...");
         remove_pkg::remove(pkg, false);
         install(pkg);
@@ -203,39 +262,41 @@ void upgrade() {
     }
 
     std::cout << "\n";
-    if (upgraded == 0)
-        std::cout << "Nothing to upgrade.\n";
-    else
-        tui::done_ok();
+    if (upgraded == 0) std::cout << "Nothing to upgrade.\n";
+    else               tui::done_ok();
 }
 
 void search(const std::string& query) {
     if (query.empty()) tui::done_err("Provide a search query");
-    if (!fs::exists(index_file()))
-        tui::done_err("INDEX not found — run: warp --sync");
 
-    std::ifstream f(index_file());
+    auto repos = load_repos();
     struct Result { std::string name, version, description; };
     std::vector<Result> results;
-    Result cur;
-    std::string line;
 
-    while (std::getline(f, line)) {
-        if (!line.empty() && line.front() == '[') {
-            if (!cur.name.empty() &&
-                (cur.name.find(query) != std::string::npos ||
-                 cur.description.find(query) != std::string::npos))
-                results.push_back(cur);
-            cur = { line.substr(1, line.size() - 2), "", "" };
-        } else if (line.rfind("version=", 0) == 0)
-            cur.version = line.substr(8);
-        else if (line.rfind("description=", 0) == 0)
-            cur.description = line.substr(12);
+    for (const auto& r : repos) {
+        fs::path idx = index_for(r.n);
+        if (!fs::exists(idx)) continue;
+
+        std::ifstream f(idx);
+        Result cur;
+        std::string line;
+        while (std::getline(f, line)) {
+            if (!line.empty() && line.front() == '[') {
+                if (!cur.name.empty() &&
+                    (cur.name.find(query)        != std::string::npos ||
+                     cur.description.find(query) != std::string::npos))
+                    results.push_back(cur);
+                cur = { line.substr(1, line.size() - 2), "", "" };
+            } else if (line.rfind("version=", 0) == 0)
+                cur.version = line.substr(8);
+            else if (line.rfind("description=", 0) == 0)
+                cur.description = line.substr(12);
+        }
+        if (!cur.name.empty() &&
+            (cur.name.find(query) != std::string::npos ||
+             cur.description.find(query) != std::string::npos))
+            results.push_back(cur);
     }
-    if (!cur.name.empty() &&
-        (cur.name.find(query) != std::string::npos ||
-         cur.description.find(query) != std::string::npos))
-        results.push_back(cur);
 
     if (results.empty()) { std::cout << "No results for: " << query << "\n"; return; }
 
@@ -245,6 +306,60 @@ void search(const std::string& query) {
     for (const auto& r : results)
         std::cout << std::left << std::setw(25) << r.name
                   << std::setw(12) << r.version << r.description << "\n";
+}
+
+void list_repos() {
+    auto repos = load_repos();
+    if (repos.empty()) { std::cout << "No repositories configured.\n"; return; }
+
+    std::cout << std::left << std::setw(4) << "  #"
+              << std::setw(45) << "URL" << "INDEX\n";
+    std::cout << std::string(60, '-') << "\n";
+
+    for (const auto& r : repos) {
+        fs::path idx = index_for(r.n);
+        std::string status = fs::exists(idx) ? "synced" : "not synced";
+        std::cout << "  " << std::left << std::setw(2) << r.n << " "
+                  << std::setw(45) << r.url << status << "\n";
+    }
+}
+
+void add_repo(const std::string& url) {
+    if (url.empty()) tui::done_err("Provide a repository URL");
+
+    fs::create_directories(repos_dir());
+
+    // Find next available number
+    int next = 1;
+    while (fs::exists(repos_dir() / (std::to_string(next) + ".conf")))
+        ++next;
+
+    std::ofstream f(repos_dir() / (std::to_string(next) + ".conf"));
+    f << "url=" << url << "\n";
+
+    std::cout << "Added repo #" << next << ": " << url << "\n";
+    std::cout << "Run 'warp --sync' to fetch the package index.\n";
+}
+
+void remove_repo(int n) {
+    if (n <= 0) tui::done_err("Provide a valid repository number (see: warp repo --list)");
+
+    fs::path conf = repos_dir() / (std::to_string(n) + ".conf");
+    if (!fs::exists(conf))
+        tui::done_err("Repository #" + std::to_string(n) + " not found");
+
+    // Read URL before deleting for display
+    std::string url;
+    { std::ifstream f(conf); std::string l;
+      while (std::getline(f, l)) if (l.rfind("url=", 0) == 0) { url = l.substr(4); break; } }
+
+    fs::remove(conf);
+
+    // Remove cached index
+    fs::path idx_dir = index_root() / std::to_string(n);
+    if (fs::exists(idx_dir)) fs::remove_all(idx_dir);
+
+    std::cout << "Removed repo #" << n << ": " << url << "\n";
 }
 
 } // namespace repo

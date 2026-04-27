@@ -1,4 +1,5 @@
 #include "install.h"
+#include "repo.h"
 #include "tui.h"
 #include "db.h"
 #include "format.h"
@@ -47,25 +48,20 @@ void from_warp(const fs::path& file) {
 
     tui::progress_bar(10);
 
-    // Check deps
+    // Resolve and auto-install deps
     fs::path deps_path = tmpdir / "DEPS";
     if (fs::exists(deps_path)) {
         std::ifstream df(deps_path);
         std::string deps_line;
         if (std::getline(df, deps_line) && !deps_line.empty()) {
-            std::vector<std::string> missing;
             std::istringstream ss(deps_line);
             std::string dep;
             while (std::getline(ss, dep, ',')) {
                 dep.erase(0, dep.find_first_not_of(' '));
                 dep.erase(dep.find_last_not_of(' ') + 1);
-                if (!dep.empty() && !db::exists(dep))
-                    missing.push_back(dep);
-            }
-            if (!missing.empty()) {
-                std::string m;
-                for (const auto& d : missing) m += d + " ";
-                tui::warn("Missing dependencies: " + m);
+                if (dep.empty() || db::exists(dep)) continue;
+                tui::log_step("Installing dependency: " + dep + "...");
+                repo::install(dep);
             }
         }
     }

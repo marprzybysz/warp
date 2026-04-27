@@ -43,8 +43,15 @@ Query:
 
 Building:
   -cP <folder>       Build a .wrp package from folder
+  -build <folder>    Build a .wrp from source (uses WARPBUILD)
+  -buildI <folder>   Build from source and install immediately
   --verify <file>    Verify checksum of a .wrp file
   --push <file>      Upload package to repository
+
+Repositories:
+  repo --list        List configured repositories
+  repo --add <url>   Add a repository
+  repo --remove <n>  Remove a repository by number
 
 Diagnostics:
   --fix              Repair broken dependencies
@@ -214,7 +221,13 @@ int main(int argc, char* argv[]) {
     else if (cmd == "--rollback") { diag::rollback(argc > 2 ? argv[2] : ""); }
     else if (cmd == "--verify")   { diag::verify(argc > 2 ? argv[2] : ""); }
     else if (cmd == "--push")     { diag::push(argc > 2 ? argv[2] : ""); }
-    else if (cmd == "--version")  { cmd_version(); }
+    else if (cmd == "repo") {
+        std::string sub = argc > 2 ? argv[2] : "";
+        if (sub == "--list")                { repo::list_repos(); }
+        else if (sub == "--add")            { repo::add_repo(argc > 3 ? argv[3] : ""); }
+        else if (sub == "--remove")         { repo::remove_repo(argc > 3 ? std::stoi(argv[3]) : 0); }
+        else { std::cerr << "Usage: warp repo --list | --add <url> | --remove <n>\n"; return 1; }
+    } else if (cmd == "--version")  { cmd_version(); }
     else if (cmd == "-info")      { cmd_sysinfo(); }
     else if (cmd == "-help" || cmd == "--help" || cmd == "-h") { usage(); }
     else if (cmd == "-q")         { usage(); }

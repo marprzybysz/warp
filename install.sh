@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
-# WARP bootstrap installer — run as root after extracting tarball
-# Usage: sudo bash install.sh
+# WARP bootstrap installer — build C++ binary and install
+# Usage: sudo bash install.sh [PREFIX=/usr]
 
 set -e
 
 PREFIX="${PREFIX:-/usr}"
 CONFDIR="${CONFDIR:-/etc/warp}"
 MANDIR="${MANDIR:-$PREFIX/share/man/man1}"
-LIBDIR="${LIBDIR:-$PREFIX/lib/warp}"
-DBDIR="${DBDIR:-/var/lib/warp/db}"
-CACHEDIR="${CACHEDIR:-/var/cache/warp}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -18,22 +15,34 @@ if [[ "$EUID" -ne 0 ]]; then
     exit 1
 fi
 
-echo "Installing WARP — Warp Archive Repository Packager"
+echo "Building WARP — Warp Archive Repository Packager"
 echo ""
 
-# Binary
-install -Dm755 "$SCRIPT_DIR/warp.sh" "$PREFIX/bin/warp"
-echo "  $PREFIX/bin/warp"
-
-# Libs
-mkdir -p "$LIBDIR"
-for f in "$SCRIPT_DIR"/lib/*.sh; do
-    install -Dm644 "$f" "$LIBDIR/$(basename "$f")"
-    echo "  $LIBDIR/$(basename "$f")"
+# Check build tools
+for cmd in cmake make pkg-config; do
+    command -v "$cmd" &>/dev/null || { echo "ERROR: $cmd not found"; exit 1; }
+done
+for lib in libarchive libcurl; do
+    pkg-config --exists "$lib" || { echo "ERROR: $lib dev package not found"; exit 1; }
 done
 
+BUILD_DIR="$SCRIPT_DIR/build"
+mkdir -p "$BUILD_DIR"
+
+cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" \
+    -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_SYSCONFDIR=/etc \
+    -DCMAKE_INSTALL_MANDIR="$PREFIX/share/man" \
+    -DCMAKE_SILENT_MAKEFILE=ON
+
+make -C "$BUILD_DIR" -j"$(nproc)"
+make -C "$BUILD_DIR" install
+
+echo "  $PREFIX/bin/warp"
+
 # Config
-mkdir -p "$CONFDIR"
+mkdir -p "$CONFDIR/repos.d"
 if [[ ! -f "$CONFDIR/warp.conf" ]]; then
     install -Dm644 "$SCRIPT_DIR/conf/warp.conf" "$CONFDIR/warp.conf"
     echo "  $CONFDIR/warp.conf"
@@ -41,20 +50,23 @@ else
     echo "  $CONFDIR/warp.conf (skipped — already exists)"
 fi
 
+# Default repo entry
+if [[ ! -f "$CONFDIR/repos.d/1.conf" ]]; then
+    echo "url=https://repo.flow.org/core" > "$CONFDIR/repos.d/1.conf"
+    echo "  $CONFDIR/repos.d/1.conf"
+fi
+
 # Man page
-if [[ -f "$SCRIPT_DIR/man/warp.1" ]]; then
+[[ -f "$SCRIPT_DIR/man/warp.1" ]] && {
     mkdir -p "$MANDIR"
     install -Dm644 "$SCRIPT_DIR/man/warp.1" "$MANDIR/warp.1"
     echo "  $MANDIR/warp.1"
-fi
+}
 
-# DB and cache dirs
-mkdir -p "$DBDIR" "$CACHEDIR/index" "$CACHEDIR/packages"
-echo "  $DBDIR"
-echo "  $CACHEDIR"
-
-# Patch warp.sh to use installed lib path
-sed -i "s|source \"\$SCRIPT_DIR/lib/|source \"$LIBDIR/|g" "$PREFIX/bin/warp"
+# Runtime dirs
+mkdir -p /var/lib/warp/db /var/cache/warp/index /var/cache/warp/packages
+echo "  /var/lib/warp/db"
+echo "  /var/cache/warp"
 
 echo ""
 echo "Done! Run: warp --version"
