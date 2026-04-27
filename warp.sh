@@ -174,9 +174,9 @@ case "$1" in
                  for (( _qi=0; _qi<total; _qi++ )); do
                      _qn=$(( _qi+1 ))
                      echo ""
-                     printf ">>> Fetching (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                     queue_msg ">>> Fetching ($_qn of $total) ${pkgs[$_qi]}"
                      repo_install "${pkgs[$_qi]}"
-                     printf ">>> Completed (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                     queue_msg ">>> Completed ($_qn of $total) ${pkgs[$_qi]}"
                  done
                  _WARP_QUEUE=0
                  echo ""
@@ -191,9 +191,9 @@ case "$1" in
                  for (( _qi=0; _qi<total; _qi++ )); do
                      _qn=$(( _qi+1 ))
                      echo ""
-                     printf ">>> Removing (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                     queue_msg ">>> Removing ($_qn of $total) ${pkgs[$_qi]}"
                      cmd_remove "${pkgs[$_qi]}" 0
-                     printf ">>> Completed (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                     queue_msg ">>> Completed ($_qn of $total) ${pkgs[$_qi]}"
                  done
                  _WARP_QUEUE=0
                  echo ""
@@ -208,9 +208,9 @@ case "$1" in
                  for (( _qi=0; _qi<total; _qi++ )); do
                      _qn=$(( _qi+1 ))
                      echo ""
-                     printf ">>> Removing (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                     queue_msg ">>> Removing ($_qn of $total) ${pkgs[$_qi]}"
                      cmd_remove "${pkgs[$_qi]}" 1
-                     printf ">>> Completed (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                     queue_msg ">>> Completed ($_qn of $total) ${pkgs[$_qi]}"
                  done
                  _WARP_QUEUE=0
                  echo ""

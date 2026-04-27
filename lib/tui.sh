@@ -84,9 +84,18 @@ log_step() {
 }
 
 done_ok() {
+    if [[ $_WARP_QUEUE -eq 1 ]]; then
+        return  # bar stays, queue handles final Done!
+    fi
     clear_progress
-    [[ $_WARP_QUEUE -eq 1 ]] && return
     printf "${GREEN}${BOLD}Done!${RESET}\n"
+}
+
+queue_msg() {
+    # print a line while keeping the progress bar pinned at bottom
+    _erase_bar
+    printf "%s\n" "$1"
+    _redraw_bar
 }
 
 done_err() {
