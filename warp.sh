@@ -89,8 +89,6 @@ cmd_install_local() {
         echo ""
         install_warp_pkg "$wrp_file"
         rm -f "$wrp_file" "${wrp_file}.sha256"
-        echo ""
-        done_ok
         return
     fi
 
@@ -102,9 +100,6 @@ cmd_install_local() {
         tarxz)  install_tarxz_pkg "$target" ;;
         unknown) done_err "Unknown format: $target" ;;
     esac
-
-    echo ""
-    done_ok
 }
 
 cmd_remove() {

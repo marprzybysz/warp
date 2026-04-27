@@ -6,8 +6,8 @@ INSTALL_PREFIX="${INSTALL_PREFIX:-}"
 install_warp_pkg() {
     local file="$1"
 
-    log_step "Detecting format..." ok
-    log_step "Extracting to temp directory..."
+    local size
+    size=$(du -sh "$file" 2>/dev/null | cut -f1)
 
     local tmpdir
     tmpdir=$(extract_to_tmp "$file") || done_err "Cannot extract archive: $file"
@@ -18,14 +18,20 @@ install_warp_pkg() {
     local name version
     name=$(grep '^name=' "$info" | cut -d= -f2)
     version=$(grep '^version=' "$info" | cut -d= -f2)
-    log_step "Reading metadata ($name $version)..." ok
 
+    [[ $QUIET -eq 0 ]] && printf "Selecting %s %s [%s]\n" "$name" "$version" "${size:-?}"
+
+    # Step weights: extract=10, metadata=20, deps=35, install_script=50, files=50-90, register=95
+    progress_bar 10 ""
+
+    progress_bar 20 ""
+
+    # Check deps
     local deps_file="$tmpdir/DEPS"
     if [[ -f "$deps_file" ]]; then
         local deps
         deps=$(cat "$deps_file")
         if [[ -n "$deps" ]]; then
-            log_step "Checking dependencies..."
             local missing=()
             while IFS=',' read -ra dep_list; do
                 for dep in "${dep_list[@]}"; do
@@ -35,25 +41,26 @@ install_warp_pkg() {
                 done
             done <<< "$deps"
             if [[ ${#missing[@]} -gt 0 ]]; then
+                clear_progress
                 warn "Missing dependencies: ${missing[*]}"
                 warn "Install them manually or use warp -G"
-            else
-                log_step "Dependencies satisfied..." ok
+                [[ $QUIET -eq 0 ]] && echo ""
             fi
         fi
     fi
+    progress_bar 35 ""
 
+    # Run INSTALL script
     if [[ -f "$tmpdir/INSTALL" ]]; then
-        log_step "Running install script..."
+        progress_bar 45 ""
         chmod +x "$tmpdir/INSTALL"
         (cd "$tmpdir" && bash INSTALL) || { rm -rf "$tmpdir"; done_err "INSTALL script failed"; }
-        log_step "Install script..." ok
     fi
+    progress_bar 50 ""
 
+    # Copy files
     if [[ -d "$tmpdir/files" ]]; then
         local dest="${INSTALL_PREFIX:-/}"
-        log_step "Installing files to $dest..."
-
         local all_files
         all_files=$(find "$tmpdir/files" -type f | sed "s|$tmpdir/files||")
         local total
@@ -67,29 +74,34 @@ install_warp_pkg() {
             mkdir -p "$(dirname "$dst")"
             cp -a "$src" "$dst"
             count=$(( count + 1 ))
-            local pct=$(( count * 100 / total ))
-            progress_bar "$pct" "Installing $name"
+            # file copy occupies 50-90% of total progress
+            local pct=$(( 50 + count * 40 / total ))
+            progress_bar "$pct" ""
         done <<< "$all_files"
 
-        clear_progress
-        log_step "Copying files..." ok
-
+        progress_bar 95 ""
         db_init
         db_save "$name" "$version" "warp" "$all_files"
     else
+        progress_bar 95 ""
         db_init
         db_save "$name" "$version" "warp"
     fi
 
-    log_step "Registering package..." ok
+    progress_bar 100 ""
+    clear_progress
     db_log "install" "$name" "$version"
     rm -rf "$tmpdir"
+
+    [[ $QUIET -eq 0 ]] && echo -e "${GREEN}${BOLD}Done!${RESET}"
 }
 
 install_tarxz_pkg() {
     local file="$1"
 
-    log_step "Detecting format..." ok
+    local size
+    size=$(du -sh "$file" 2>/dev/null | cut -f1)
+
     warn "No WARPINFO — raw mode"
     [[ $QUIET -eq 0 ]] && echo ""
 
@@ -97,10 +109,12 @@ install_tarxz_pkg() {
     name=$(name_from_file "$file")
     version=$(version_from_file "$file")
 
-    log_step "Extracting $name..."
+    [[ $QUIET -eq 0 ]] && printf "Selecting %s %s [%s]\n" "$name" "$version" "${size:-?}"
 
     local tmpdir
     tmpdir=$(extract_to_tmp "$file") || done_err "Cannot extract archive: $file"
+
+    progress_bar 10 ""
 
     local all_files
     all_files=$(find "$tmpdir" -type f | sed "s|$tmpdir||")
@@ -116,12 +130,11 @@ install_tarxz_pkg() {
         mkdir -p "$(dirname "$dst")"
         cp -a "$src" "$dst"
         count=$(( count + 1 ))
-        local pct=$(( count * 100 / total ))
-        progress_bar "$pct" "Extracting"
+        local pct=$(( 10 + count * 80 / total ))
+        progress_bar "$pct" ""
     done <<< "$all_files"
 
-    clear_progress
-    log_step "Extraction..." ok
+    progress_bar 95 ""
 
     local installed_files
     installed_files=$(echo "$all_files" | sed "s|^|/|" | sed 's|//|/|g')
@@ -129,10 +142,10 @@ install_tarxz_pkg() {
     db_init
     db_save "$name" "$version" "tarxz" "$installed_files"
 
-    log_step "Registering package..." ok
+    progress_bar 100 ""
+    clear_progress
     db_log "install" "$name" "$version"
-    if [[ $QUIET -eq 0 ]]; then
-        echo ""
-        echo "Installed to: / (paths from archive)"
-    fi
+    rm -rf "$tmpdir"
+
+    [[ $QUIET -eq 0 ]] && echo -e "${GREEN}${BOLD}Done!${RESET}"
 }
