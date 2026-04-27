@@ -78,7 +78,7 @@ format_size() {
         local h=$(( kb * 100 / 1024 ))
         printf "%d.%02d MB" $(( h / 100 )) $(( h % 100 ))
     else
-        local t=$(( kb * 10 / 1048576 ))
-        printf "%d.%d GB" $(( t / 10 )) $(( t % 10 ))
+        local h=$(( kb * 100 / 1048576 ))
+        printf "%d.%02d GB" $(( h / 100 )) $(( h % 100 ))
     fi
 }
