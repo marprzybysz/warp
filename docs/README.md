@@ -52,3 +52,30 @@ firefox.wrp
 ```
 
 WARP also accepts plain `.tar.xz` archives (raw mode — no metadata, no dependency resolution).
+
+---
+
+## Repository Policy
+
+The official Flow Linux repository is **curated and verified**. Every package that lands in the repo goes through the following process:
+
+1. Package is submitted by the community or a maintainer
+2. A maintainer reviews the `WARPBUILD` / package contents
+3. The package is compiled in a clean environment
+4. SHA256 checksum is generated and added to the INDEX
+5. The package is published
+
+**Community members cannot push packages directly.** If you want a package added to the official repo, open an issue or pull request on GitHub with your `WARPBUILD` file. Maintainers will review and publish it.
+
+This keeps the repository safe — every package in the repo has been seen by a human before it reaches your system.
+
+---
+
+## Contributing a Package
+
+1. Write a `WARPBUILD` for the software you want packaged (see [Creating Packages](creating-packages.md))
+2. Test it locally with `warp -build <folder>` and `warp -i <file.wrp>`
+3. Open an issue on the Flow Linux GitHub with the `WARPBUILD` attached
+4. A maintainer will review, build, and publish it
+
+If you want to become a maintainer, reach out on GitHub.
