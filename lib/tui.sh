@@ -36,7 +36,6 @@ _draw_bar() {
 }
 
 progress_bar() {
-    [[ $QUIET -eq 1 ]] && return
     local pct="$1"
     [[ $pct -lt 0 ]]   && pct=0
     [[ $pct -gt 100 ]] && pct=100
@@ -63,7 +62,6 @@ _erase_bar() {
 }
 
 clear_progress() {
-    [[ $QUIET -eq 1 ]] && return
     _erase_bar
     _PROGRESS_PCT=-1
 }
