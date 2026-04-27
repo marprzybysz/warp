@@ -158,15 +158,25 @@ cmd_sysinfo() {
 
 [[ $# -eq 0 ]] && { usage; exit 0; }
 
-# Tryb cichy
+# Tryb cichy — wykryj -q gdziekolwiek w argumentach
 for arg in "$@"; do
     [[ "$arg" == "-q" ]] && QUIET=1
 done
 
+# Zbierz argumenty bez flag (pomija -q i inne flagi)
+_pkg_args() {
+    local arr=()
+    for a in "$@"; do
+        [[ "$a" == -q ]] && continue
+        arr+=("$a")
+    done
+    printf '%s\n' "${arr[@]}"
+}
+
 case "$1" in
     -i)      cmd_install_local "$2" ;;
     -G)      shift
-             pkgs=("$@"); total=${#pkgs[@]}
+             mapfile -t pkgs < <(_pkg_args "$@"); total=${#pkgs[@]}
              if [[ $total -eq 1 ]]; then
                  repo_install "${pkgs[0]}"
              else
@@ -183,7 +193,7 @@ case "$1" in
                  done_ok
              fi ;;
     -D)      shift
-             pkgs=("$@"); total=${#pkgs[@]}
+             mapfile -t pkgs < <(_pkg_args "$@"); total=${#pkgs[@]}
              if [[ $total -eq 1 ]]; then
                  cmd_remove "${pkgs[0]}" 0
              else
@@ -200,7 +210,7 @@ case "$1" in
                  done_ok
              fi ;;
     -DD)     shift
-             pkgs=("$@"); total=${#pkgs[@]}
+             mapfile -t pkgs < <(_pkg_args "$@"); total=${#pkgs[@]}
              if [[ $total -eq 1 ]]; then
                  cmd_remove "${pkgs[0]}" 1
              else
