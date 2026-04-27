@@ -18,6 +18,7 @@ source "$SCRIPT_DIR/lib/remove.sh"
 source "$SCRIPT_DIR/lib/build.sh"
 source "$SCRIPT_DIR/lib/build_src.sh"
 source "$SCRIPT_DIR/lib/repo.sh"
+source "$SCRIPT_DIR/lib/diag.sh"
 
 config_load
 
@@ -176,12 +177,21 @@ case "$1" in
     -s)      cmd_info "$2" ;;
     -S)      cmd_owner "$2" ;;
     -ls)     repo_search "$2" ;;
-    -U)      done_err "Upgrade not yet implemented" ;;
-    -LU)     done_err "List updates not yet implemented" ;;
+    -U)      repo_upgrade ;;
+    -LU)     repo_list_updates ;;
     -cP)     build_pkg "$2" && echo "" && done_ok ;;
     -build)  build_from_source "$2" 0 && done_ok ;;
     -buildI) build_from_source "$2" 1 && done_ok ;;
     --sync)  repo_sync && echo "" && done_ok ;;
+    -DC)     cmd_remove_cache "$2" ;;
+    -DA)     cmd_remove_all "$2" && echo "" && done_ok ;;
+    --fix)   cmd_fix ;;
+    --check) cmd_check ;;
+    --orphans) cmd_orphans ;;
+    --log)   cmd_log ;;
+    --rollback) cmd_rollback "$2" ;;
+    --verify) cmd_verify "$2" ;;
+    --push)  cmd_push "$2" ;;
     -info)   cmd_sysinfo ;;
     -help|--help|-h) usage ;;
     -q)      usage ;;

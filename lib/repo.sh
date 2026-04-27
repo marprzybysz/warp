@@ -111,6 +111,70 @@ _curl_progress() {
     log_step "Downloaded $pkg..." ok
 }
 
+repo_list_updates() {
+    local index="$WARP_INDEX_DIR/INDEX"
+    [[ -f "$index" ]] || done_err "INDEX not found — run: warp --sync"
+
+    local updates=()
+    for pkg_dir in "$WARP_DB"/*/; do
+        [[ -d "$pkg_dir" ]] || continue
+        local name
+        name=$(basename "$pkg_dir")
+        local installed_ver
+        installed_ver=$(grep '^version=' "$pkg_dir/WARPINFO" 2>/dev/null | cut -d= -f2)
+        local repo_ver
+        repo_ver=$(repo_index_get "$name" "version" 2>/dev/null)
+        [[ -z "$repo_ver" ]] && continue
+        [[ "$repo_ver" == "$installed_ver" ]] && continue
+        updates+=("$name|$installed_ver|$repo_ver")
+    done
+
+    if [[ ${#updates[@]} -eq 0 ]]; then
+        echo "All packages up to date."
+        return 0
+    fi
+
+    printf "%-25s %-15s %s\n" "PACKAGE" "INSTALLED" "AVAILABLE"
+    printf "%-25s %-15s %s\n" "-------" "---------" "---------"
+    for entry in "${updates[@]}"; do
+        IFS='|' read -r pkg inst avail <<< "$entry"
+        printf "%-25s %-15s %s\n" "$pkg" "$inst" "$avail"
+    done
+    return 1
+}
+
+repo_upgrade() {
+    local index="$WARP_INDEX_DIR/INDEX"
+    [[ -f "$index" ]] || done_err "INDEX not found — run: warp --sync"
+
+    local upgraded=0
+    for pkg_dir in "$WARP_DB"/*/; do
+        [[ -d "$pkg_dir" ]] || continue
+        local name
+        name=$(basename "$pkg_dir")
+        local installed_ver
+        installed_ver=$(grep '^version=' "$pkg_dir/WARPINFO" 2>/dev/null | cut -d= -f2)
+        local repo_ver
+        repo_ver=$(repo_index_get "$name" "version" 2>/dev/null)
+        [[ -z "$repo_ver" ]] && continue
+        [[ "$repo_ver" == "$installed_ver" ]] && continue
+
+        log_step "Upgrading $name: $installed_ver → $repo_ver..."
+        remove_pkg "$name" 0
+        repo_install "$name"
+        db_log "upgrade" "$name" "$repo_ver"
+        upgraded=$(( upgraded + 1 ))
+    done
+
+    echo ""
+    if [[ $upgraded -eq 0 ]]; then
+        echo "Nothing to upgrade."
+    else
+        echo "$upgraded package(s) upgraded."
+        done_ok
+    fi
+}
+
 repo_search() {
     local query="$1"
     local index="$WARP_INDEX_DIR/INDEX"

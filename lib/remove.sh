@@ -44,4 +44,5 @@ remove_pkg() {
 
     db_remove "$name"
     log_step "Package record removed..." ok
+    db_log "remove" "$name"
 }

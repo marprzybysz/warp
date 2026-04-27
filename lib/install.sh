@@ -82,6 +82,7 @@ install_warp_pkg() {
     fi
 
     log_step "Registering package..." ok
+    db_log "install" "$name" "$version"
     rm -rf "$tmpdir"
 }
 
@@ -129,6 +130,7 @@ install_tarxz_pkg() {
     db_save "$name" "$version" "tarxz" "$installed_files"
 
     log_step "Registering package..." ok
+    db_log "install" "$name" "$version"
     if [[ $QUIET -eq 0 ]]; then
         echo ""
         echo "Installed to: / (paths from archive)"
