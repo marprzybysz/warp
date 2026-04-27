@@ -165,9 +165,57 @@ done
 
 case "$1" in
     -i)      cmd_install_local "$2" ;;
-    -G)      shift; for pkg in "$@"; do repo_install "$pkg"; done ;;
-    -D)      shift; for pkg in "$@"; do cmd_remove "$pkg" 0; done ;;
-    -DD)     shift; for pkg in "$@"; do cmd_remove "$pkg" 1; done ;;
+    -G)      shift
+             pkgs=("$@"); total=${#pkgs[@]}
+             if [[ $total -eq 1 ]]; then
+                 repo_install "${pkgs[0]}"
+             else
+                 _WARP_QUEUE=1
+                 for (( _qi=0; _qi<total; _qi++ )); do
+                     _qn=$(( _qi+1 ))
+                     echo ""
+                     printf ">>> Fetching (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                     repo_install "${pkgs[$_qi]}"
+                     printf ">>> Completed (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                 done
+                 _WARP_QUEUE=0
+                 echo ""
+                 done_ok
+             fi ;;
+    -D)      shift
+             pkgs=("$@"); total=${#pkgs[@]}
+             if [[ $total -eq 1 ]]; then
+                 cmd_remove "${pkgs[0]}" 0
+             else
+                 _WARP_QUEUE=1
+                 for (( _qi=0; _qi<total; _qi++ )); do
+                     _qn=$(( _qi+1 ))
+                     echo ""
+                     printf ">>> Removing (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                     cmd_remove "${pkgs[$_qi]}" 0
+                     printf ">>> Completed (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                 done
+                 _WARP_QUEUE=0
+                 echo ""
+                 done_ok
+             fi ;;
+    -DD)     shift
+             pkgs=("$@"); total=${#pkgs[@]}
+             if [[ $total -eq 1 ]]; then
+                 cmd_remove "${pkgs[0]}" 1
+             else
+                 _WARP_QUEUE=1
+                 for (( _qi=0; _qi<total; _qi++ )); do
+                     _qn=$(( _qi+1 ))
+                     echo ""
+                     printf ">>> Removing (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                     cmd_remove "${pkgs[$_qi]}" 1
+                     printf ">>> Completed (%d of %d) %s\n" "$_qn" "$total" "${pkgs[$_qi]}"
+                 done
+                 _WARP_QUEUE=0
+                 echo ""
+                 done_ok
+             fi ;;
     -A)      cmd_list ;;
     -s)      cmd_info "$2" ;;
     -S)      cmd_owner "$2" ;;

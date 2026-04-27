@@ -14,6 +14,7 @@ FG_BLACK='\033[30m'
 
 QUIET=0
 _PROGRESS_PCT=-1  # -1 = no active progress bar
+_WARP_QUEUE=0
 
 _term_width()  { tput cols  2>/dev/null || echo 80; }
 _term_height() { tput lines 2>/dev/null || echo 24; }
@@ -84,6 +85,7 @@ log_step() {
 
 done_ok() {
     clear_progress
+    [[ $_WARP_QUEUE -eq 1 ]] && return
     printf "${GREEN}${BOLD}Done!${RESET}\n"
 }
 
