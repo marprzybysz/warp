@@ -67,3 +67,18 @@ warn() {
     [[ $QUIET -eq 1 ]] && return
     echo -e "${YELLOW}⚠ $1${RESET}"
 }
+
+format_size() {
+    local file="$1"
+    local kb
+    kb=$(du -sk "$file" 2>/dev/null | cut -f1)
+    if (( kb < 1024 )); then
+        echo "${kb} kB"
+    elif (( kb < 1048576 )); then
+        local h=$(( kb * 100 / 1024 ))
+        printf "%d.%02d MB" $(( h / 100 )) $(( h % 100 ))
+    else
+        local t=$(( kb * 10 / 1048576 ))
+        printf "%d.%d GB" $(( t / 10 )) $(( t % 10 ))
+    fi
+}

@@ -7,7 +7,7 @@ install_warp_pkg() {
     local file="$1"
 
     local size
-    size=$(du -sh "$file" 2>/dev/null | cut -f1)
+    size=$(format_size "$file")
 
     local tmpdir
     tmpdir=$(extract_to_tmp "$file") || done_err "Cannot extract archive: $file"
@@ -100,7 +100,7 @@ install_tarxz_pkg() {
     local file="$1"
 
     local size
-    size=$(du -sh "$file" 2>/dev/null | cut -f1)
+    size=$(format_size "$file")
 
     warn "No WARPINFO — raw mode"
     [[ $QUIET -eq 0 ]] && echo ""
