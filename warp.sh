@@ -143,12 +143,19 @@ cmd_owner() {
     fi
 }
 
+cmd_version() {
+    echo "WARP $WARP_VERSION — Warp Archive Repository Packager"
+    echo "Copyright (C) 2026 Marcin Przybysz"
+    echo "License: GPL-2.0 <https://www.gnu.org/licenses/>"
+}
+
 cmd_sysinfo() {
-    echo "WARP Package Manager $WARP_VERSION"
-    echo "Arch:    $(uname -m)"
-    echo "Kernel:  $(uname -r)"
-    echo "Locale:  $LANG"
-    echo "DB:      $WARP_DB"
+    cmd_version
+    echo ""
+    echo "Arch:     $(uname -m)"
+    echo "Kernel:   $(uname -r)"
+    echo "Locale:   $LANG"
+    echo "DB:       $WARP_DB"
     local count=0
     [[ -d "$WARP_DB" ]] && count=$(find "$WARP_DB" -maxdepth 1 -mindepth 1 -type d | wc -l)
     echo "Packages: $count installed"
@@ -245,7 +252,8 @@ case "$1" in
     --rollback) cmd_rollback "$2" ;;
     --verify) cmd_verify "$2" ;;
     --push)  cmd_push "$2" ;;
-    -info)   cmd_sysinfo ;;
+    -info)      cmd_sysinfo ;;
+    --version)  cmd_version ;;
     -help|--help|-h) usage ;;
     -q)      usage ;;
     *)       echo -e "${RED}Unknown option: $1${RESET}"; usage; exit 1 ;;
