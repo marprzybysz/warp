@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBARCHIVE REQUIRED libarchive)
+pkg_check_modules(LIBCURL REQUIRED libcurl)
 
 add_executable(warp
     src/main.cpp
@@ -21,10 +22,9 @@ add_executable(warp
     src/diag.cpp
 )
 
-# uname() in main.cpp
-target_link_libraries(warp PRIVATE ${LIBARCHIVE_LIBRARIES})
+target_link_libraries(warp PRIVATE ${LIBARCHIVE_LIBRARIES} ${LIBCURL_LIBRARIES})
 
-target_include_directories(warp PRIVATE src ${LIBARCHIVE_INCLUDE_DIRS})
+target_include_directories(warp PRIVATE src ${LIBARCHIVE_INCLUDE_DIRS} ${LIBCURL_INCLUDE_DIRS})
 target_compile_options(warp PRIVATE -Wall -Wextra -Wpedantic)
 
 install(TARGETS warp RUNTIME DESTINATION bin)

@@ -11,33 +11,60 @@
 #include <iomanip>
 #include <array>
 #include <cstdio>
+#include <curl/curl.h>
 
 namespace repo {
 
 namespace fs = std::filesystem;
 
-static fs::path index_dir()   { return fs::path(config::cfg.cache_dir) / "index"; }
-static fs::path pkg_cache()   { return fs::path(config::cfg.cache_dir) / "packages"; }
-static fs::path index_file()  { return index_dir() / "INDEX"; }
+static fs::path index_dir()  { return fs::path(config::cfg.cache_dir) / "index"; }
+static fs::path pkg_cache()  { return fs::path(config::cfg.cache_dir) / "packages"; }
+static fs::path index_file() { return index_dir() / "INDEX"; }
 
-static std::string run(const std::string& cmd) {
-    std::array<char, 256> buf{};
-    std::string out;
-    FILE* p = popen(cmd.c_str(), "r");
-    if (!p) return "";
-    while (fgets(buf.data(), buf.size(), p))
-        out += buf.data();
-    pclose(p);
-    if (!out.empty() && out.back() == '\n') out.pop_back();
-    return out;
+// libcurl write callback — writes data to a file
+static size_t write_file(void* ptr, size_t size, size_t nmemb, void* stream) {
+    return fwrite(ptr, size, nmemb, static_cast<FILE*>(stream));
 }
 
-static bool download(const std::string& url, const fs::path& dest) {
+// libcurl progress callback — updates tui progress bar
+static int progress_cb(void* /*client*/,
+                        curl_off_t dltotal, curl_off_t dlnow,
+                        curl_off_t /*ultotal*/, curl_off_t /*ulnow*/) {
+    if (dltotal > 0) {
+        int pct = static_cast<int>(dlnow * 100 / dltotal);
+        tui::progress_bar(pct);
+    }
+    return 0;
+}
+
+static bool curl_download(const std::string& url, const fs::path& dest) {
     fs::create_directories(dest.parent_path());
-    std::string cmd = "curl -fsSL --max-time " +
-                      std::to_string(config::cfg.timeout) +
-                      " -o " + dest.string() + " " + url;
-    return std::system(cmd.c_str()) == 0;
+
+    FILE* f = fopen(dest.c_str(), "wb");
+    if (!f) return false;
+
+    CURL* curl = curl_easy_init();
+    if (!curl) { fclose(f); return false; }
+
+    curl_easy_setopt(curl, CURLOPT_URL,            url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,  write_file);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA,      f);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT,        static_cast<long>(config::cfg.timeout));
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR,    1L);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS,     0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_cb);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT,      "warp/0.1.0");
+
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    fclose(f);
+
+    if (res != CURLE_OK) {
+        fs::remove(dest);
+        return false;
+    }
+    return true;
 }
 
 static std::string index_get(const std::string& pkg, const std::string& field) {
@@ -56,13 +83,25 @@ static std::string index_get(const std::string& pkg, const std::string& field) {
     return "";
 }
 
+static std::string sha256sum(const fs::path& file) {
+    std::array<char, 128> buf{};
+    FILE* p = popen(("sha256sum " + file.string() + " | cut -d' ' -f1").c_str(), "r");
+    if (!p) return "";
+    fgets(buf.data(), buf.size(), p);
+    pclose(p);
+    std::string s(buf.data());
+    s.erase(s.find_last_not_of(" \n\r") + 1);
+    return s;
+}
+
 void sync() {
     std::string url = config::cfg.repo + "/INDEX";
     tui::log_step("Syncing from " + config::cfg.repo + "...");
     fs::create_directories(index_dir());
 
-    if (!download(url, index_file()))
+    if (!curl_download(url, index_file()))
         tui::done_err("Cannot fetch INDEX from " + url);
+    tui::clear_progress();
 
     std::ifstream f(index_file());
     int count = 0;
@@ -90,7 +129,7 @@ void install(const std::string& pkg) {
     }
 
     std::string file_rel = index_get(pkg, "file");
-    std::string sha256   = index_get(pkg, "sha256");
+    std::string expected_sha = index_get(pkg, "sha256");
     if (file_rel.empty())
         tui::done_err("No file entry for '" + pkg + "' in INDEX");
 
@@ -100,22 +139,20 @@ void install(const std::string& pkg) {
         std::string url = config::cfg.repo + "/" + file_rel;
         tui::log_step("Downloading " + pkg + " " + version + "...");
         fs::create_directories(pkg_cache());
-        std::string cmd = "curl -fL --max-time " +
-                          std::to_string(config::cfg.timeout) +
-                          " -o " + cached.string() + " " + url;
-        if (std::system(cmd.c_str()) != 0) {
-            fs::remove(cached);
+
+        if (!curl_download(url, cached))
             tui::done_err("Download failed: " + url);
-        }
+
+        tui::clear_progress();
         tui::log_step("Downloaded " + pkg + "...", "ok");
     } else {
         tui::log_step("From cache: " + cached.filename().string(), "ok");
     }
 
-    if (!sha256.empty()) {
+    if (!expected_sha.empty()) {
         tui::log_step("Verifying checksum...");
-        std::string actual = run("sha256sum " + cached.string() + " | cut -d' ' -f1");
-        if (actual != sha256) {
+        std::string actual = sha256sum(cached);
+        if (actual != expected_sha) {
             fs::remove(cached);
             tui::done_err("SHA256 mismatch — corrupted file");
         }
@@ -133,7 +170,7 @@ void list_updates() {
     std::vector<Update> updates;
 
     for (const auto& pkg : db::list_names()) {
-        std::string inst = db::get_version(pkg);
+        std::string inst  = db::get_version(pkg);
         std::string avail = index_get(pkg, "version");
         if (avail.empty() || avail == inst) continue;
         updates.push_back({pkg, inst, avail});
@@ -158,7 +195,6 @@ void upgrade() {
         std::string inst  = db::get_version(pkg);
         std::string avail = index_get(pkg, "version");
         if (avail.empty() || avail == inst) continue;
-
         tui::log_step("Upgrading " + pkg + ": " + inst + " → " + avail + "...");
         remove_pkg::remove(pkg, false);
         install(pkg);
@@ -191,8 +227,10 @@ void search(const std::string& query) {
                  cur.description.find(query) != std::string::npos))
                 results.push_back(cur);
             cur = { line.substr(1, line.size() - 2), "", "" };
-        } else if (line.rfind("version=", 0) == 0)     cur.version     = line.substr(8);
-          else if (line.rfind("description=", 0) == 0) cur.description = line.substr(12);
+        } else if (line.rfind("version=", 0) == 0)
+            cur.version = line.substr(8);
+        else if (line.rfind("description=", 0) == 0)
+            cur.description = line.substr(12);
     }
     if (!cur.name.empty() &&
         (cur.name.find(query) != std::string::npos ||
