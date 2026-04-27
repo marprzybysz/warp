@@ -15,7 +15,9 @@ void save(const std::string& name,
           const std::vector<std::string>& files = {});
 
 std::string get_info(const std::string& name);
+std::string get_version(const std::string& name);
 std::vector<std::string> get_files(const std::string& name);
+std::string get_deps(const std::string& name);
 void remove(const std::string& name);
 
 struct PkgEntry {
@@ -23,8 +25,11 @@ struct PkgEntry {
     std::string version;
 };
 std::vector<PkgEntry> list_all();
+std::vector<std::string> list_names();
 
 std::string owner_of(const std::string& filepath);
+
+void log(const std::string& action, const std::string& pkg, const std::string& version = "");
 
 extern std::filesystem::path db_root;
 

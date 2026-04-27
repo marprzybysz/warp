@@ -5,19 +5,18 @@
 #include <fstream>
 #include <sstream>
 #include <vector>
-#include <algorithm>
+#include <iostream>
 
 namespace install {
 
 namespace fs = std::filesystem;
 
-static std::string read_warpinfo_field(const fs::path& info, const std::string& key) {
+static std::string read_field(const fs::path& info, const std::string& key) {
     std::ifstream f(info);
     std::string line;
-    while (std::getline(f, line)) {
+    while (std::getline(f, line))
         if (line.rfind(key + "=", 0) == 0)
             return line.substr(key.size() + 1);
-    }
     return "";
 }
 
@@ -29,25 +28,8 @@ static std::vector<std::string> collect_files(const fs::path& dir) {
     return files;
 }
 
-static void copy_with_progress(const std::vector<std::string>& src_files,
-                                const fs::path& src_root,
-                                const fs::path& dest_root,
-                                const std::string& pkg_name) {
-    int total = static_cast<int>(src_files.size());
-    int count = 0;
-    for (const auto& src : src_files) {
-        fs::path rel = fs::relative(src, src_root);
-        fs::path dst = dest_root / rel;
-        fs::create_directories(dst.parent_path());
-        fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
-        ++count;
-        tui::progress_bar(count * 100 / total, "Installing " + pkg_name);
-    }
-    tui::clear_progress();
-}
-
 void from_warp(const fs::path& file) {
-    tui::log_step("Detecting format...", "ok");
+    std::string size = tui::format_size(file.string());
 
     fs::path tmpdir = format::extract_to_tmp(file);
 
@@ -57,9 +39,13 @@ void from_warp(const fs::path& file) {
         tui::done_err("WARPINFO missing from package");
     }
 
-    std::string name    = read_warpinfo_field(info_path, "name");
-    std::string version = read_warpinfo_field(info_path, "version");
-    tui::log_step("Reading metadata (" + name + " " + version + ")...", "ok");
+    std::string name    = read_field(info_path, "name");
+    std::string version = read_field(info_path, "version");
+
+    if (!tui::quiet)
+        std::cout << "Selecting " << name << " " << version << " [" << size << "]\n";
+
+    tui::progress_bar(10);
 
     // Check deps
     fs::path deps_path = tmpdir / "DEPS";
@@ -67,7 +53,6 @@ void from_warp(const fs::path& file) {
         std::ifstream df(deps_path);
         std::string deps_line;
         if (std::getline(df, deps_line) && !deps_line.empty()) {
-            tui::log_step("Checking dependencies...");
             std::vector<std::string> missing;
             std::istringstream ss(deps_line);
             std::string dep;
@@ -81,52 +66,58 @@ void from_warp(const fs::path& file) {
                 std::string m;
                 for (const auto& d : missing) m += d + " ";
                 tui::warn("Missing dependencies: " + m);
-            } else {
-                tui::log_step("Dependencies satisfied...", "ok");
             }
         }
     }
+    tui::progress_bar(35);
 
     // Run INSTALL script if present
     fs::path install_script = tmpdir / "INSTALL";
     if (fs::exists(install_script)) {
-        tui::log_step("Running install script...");
+        tui::progress_bar(45);
         fs::permissions(install_script, fs::perms::owner_exec, fs::perm_options::add);
-        int ret = std::system(install_script.c_str());
-        if (ret != 0) {
+        if (std::system(install_script.c_str()) != 0) {
             fs::remove_all(tmpdir);
             tui::done_err("INSTALL script failed");
         }
-        tui::log_step("Install script...", "ok");
     }
+    tui::progress_bar(50);
 
     // Copy files
     fs::path files_dir = tmpdir / "files";
     std::vector<std::string> installed_files;
     if (fs::is_directory(files_dir)) {
         auto src_files = collect_files(files_dir);
-        copy_with_progress(src_files, files_dir, "/", name);
-        tui::log_step("Copying files...", "ok");
-
+        int total = static_cast<int>(src_files.size());
+        int count = 0;
         for (const auto& src : src_files) {
-            std::string rel = fs::relative(src, files_dir).string();
-            installed_files.push_back("/" + rel);
+            fs::path rel = fs::relative(src, files_dir);
+            fs::path dst = fs::path("/") / rel;
+            fs::create_directories(dst.parent_path());
+            fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
+            installed_files.push_back(dst.string());
+            ++count;
+            tui::progress_bar(50 + count * 40 / total);
         }
     }
 
+    tui::progress_bar(95);
     db::save(name, version, "warp", installed_files);
-    tui::log_step("Registering package...", "ok");
+    tui::progress_bar(100);
+    db::log("install", name, version);
     fs::remove_all(tmpdir);
+    tui::done_ok();
 }
 
 void from_tarxz(const fs::path& file) {
-    tui::log_step("Detecting format...", "ok");
+    std::string size = tui::format_size(file.string());
     tui::warn("No WARPINFO — raw mode");
-    tui::println("");
 
     std::string name    = format::name_from_file(file);
     std::string version = format::version_from_file(file);
-    tui::log_step("Extracting " + name + "...");
+
+    if (!tui::quiet)
+        std::cout << "Selecting " << name << " " << version << " [" << size << "]\n";
 
     fs::path tmpdir = format::extract_to_tmp(file);
     auto src_files  = collect_files(tmpdir);
@@ -135,25 +126,23 @@ void from_tarxz(const fs::path& file) {
     int count = 0;
     std::vector<std::string> installed_files;
 
+    tui::progress_bar(10);
     for (const auto& src : src_files) {
-        std::string rel = fs::relative(src, tmpdir).string();
+        fs::path rel = fs::relative(src, tmpdir);
         fs::path dst = fs::path("/") / rel;
         fs::create_directories(dst.parent_path());
         fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
         installed_files.push_back(dst.string());
         ++count;
-        tui::progress_bar(count * 100 / total, "Extracting");
+        tui::progress_bar(10 + count * 80 / total);
     }
 
-    tui::clear_progress();
-    tui::log_step("Extraction...", "ok");
-
+    tui::progress_bar(95);
     db::save(name, version, "tarxz", installed_files);
-    tui::log_step("Registering package...", "ok");
-    tui::println("");
-    tui::println("Installed to: /usr/local (paths from archive)");
-
+    tui::progress_bar(100);
+    db::log("install", name, version);
     fs::remove_all(tmpdir);
+    tui::done_ok();
 }
 
 } // namespace install

@@ -18,10 +18,13 @@ add_executable(warp
     src/remove.cpp
     src/build.cpp
     src/repo.cpp
+    src/diag.cpp
 )
 
-target_include_directories(warp PRIVATE src ${LIBARCHIVE_INCLUDE_DIRS})
+# uname() in main.cpp
 target_link_libraries(warp PRIVATE ${LIBARCHIVE_LIBRARIES})
+
+target_include_directories(warp PRIVATE src ${LIBARCHIVE_INCLUDE_DIRS})
 target_compile_options(warp PRIVATE -Wall -Wextra -Wpedantic)
 
 install(TARGETS warp RUNTIME DESTINATION bin)

@@ -6,21 +6,27 @@
 #include "remove.h"
 #include "build.h"
 #include "repo.h"
+#include "diag.h"
 #include <iostream>
 #include <iomanip>
 #include <clocale>
 #include <filesystem>
+#include <vector>
+#include <string>
+#include <algorithm>
 
 namespace fs = std::filesystem;
+
+static const std::string WARP_VERSION = "0.1.0";
 
 static void usage() {
     std::cout << R"(Usage: warp [options] [package/file]
 
 Package management:
-  -G  <pkg>          Install from repository
+  -G  <pkg...>       Install from repository (one or more packages)
   -i  <file|folder>  Install locally (.wrp or .tar.xz)
-  -D  <pkg>          Remove package
-  -DD <pkg>          Remove package and its dependencies
+  -D  <pkg...>       Remove package(s)
+  -DD <pkg...>       Remove package(s) and dependencies
   -DC <pkg>          Remove cached files for package
   -DA <pkg>          Remove package, dependencies, and cache
 
@@ -40,12 +46,6 @@ Building:
   --verify <file>    Verify checksum of a .wrp file
   --push <file>      Upload package to repository
 
-Repositories:
-  repo --list        List configured repositories
-  repo --add <url>   Add a repository
-  repo --remove <n>  Remove a repository
-  repo --info <n>    Show repository details
-
 Diagnostics:
   --fix              Repair broken dependencies
   --check            Verify integrity of installed packages
@@ -54,63 +54,52 @@ Diagnostics:
   --rollback <pkg>   Revert package to previous version
 
 System:
+  --version          Show version and license
   -info              WARP version and system info
-  -help [flag]       Show help (optionally for a specific flag)
-  -q                 Quiet mode
+  -help              Show this help
+  -q                 Quiet mode (can appear anywhere)
 )";
 }
 
-static void cmd_install_local(const std::string& target) {
-    if (target.empty())        tui::done_err("Provide a file or folder path");
-    if (!fs::exists(target))   tui::done_err("Not found: " + target);
+static void cmd_version() {
+    std::cout << "WARP " << WARP_VERSION << " — Warp Archive Repository Packager\n"
+              << "Copyright (C) 2026 Marcin Przybysz\n"
+              << "License: GPL-2.0 <https://www.gnu.org/licenses/>\n";
+}
 
-    // Folder → build .wrp on the fly, then install
+static void cmd_install_local(const std::string& target) {
+    if (target.empty())       tui::done_err("Provide a file or folder path");
+    if (!fs::exists(target))  tui::done_err("Not found: " + target);
+
     if (fs::is_directory(target)) {
         tui::log_step("Directory detected — building package...");
-        fs::path tmp_wrp = fs::temp_directory_path() / ("warp-install." + std::to_string(getpid()));
-        fs::current_path(fs::temp_directory_path());
         build::create_pkg(target);
-
-        // Find the generated .wrp
         fs::path wrp_file;
-        for (const auto& e : fs::directory_iterator(fs::temp_directory_path())) {
+        for (const auto& e : fs::directory_iterator(fs::temp_directory_path()))
             if (e.path().extension() == ".wrp") { wrp_file = e.path(); break; }
-        }
         if (wrp_file.empty()) tui::done_err("Failed to build package from folder");
-
-        tui::println("");
         install::from_warp(wrp_file);
         fs::remove(wrp_file);
         fs::remove(fs::path(wrp_file.string() + ".sha256"));
-        tui::println("");
-        tui::done_ok();
         return;
     }
 
     auto fmt = format::detect(target);
     switch (fmt) {
-        case format::Type::Warp:   install::from_warp(target);   break;
-        case format::Type::TarXz:  install::from_tarxz(target);  break;
-        case format::Type::Unknown:
-            tui::done_err("Unknown format: " + target);
+        case format::Type::Warp:    install::from_warp(target);   break;
+        case format::Type::TarXz:   install::from_tarxz(target);  break;
+        case format::Type::Unknown: tui::done_err("Unknown format: " + target);
     }
-    tui::println("");
-    tui::done_ok();
 }
 
 static void cmd_remove(const std::string& name, bool with_deps) {
     if (name.empty()) tui::done_err("Provide a package name");
     remove_pkg::remove(name, with_deps);
-    tui::println("");
-    tui::done_ok();
 }
 
 static void cmd_list() {
     auto pkgs = db::list_all();
-    if (pkgs.empty()) {
-        std::cout << "No packages installed.\n";
-        return;
-    }
+    if (pkgs.empty()) { std::cout << "No packages installed.\n"; return; }
     std::cout << std::left << std::setw(30) << "PACKAGE" << "VERSION\n";
     std::cout << std::string(30, '-') << "-------\n";
     for (const auto& p : pkgs)
@@ -118,67 +107,117 @@ static void cmd_list() {
 }
 
 static void cmd_info(const std::string& name) {
-    if (name.empty())        tui::done_err("Provide a package name");
-    if (!db::exists(name))   tui::done_err("Package '" + name + "' is not installed");
+    if (name.empty())       tui::done_err("Provide a package name");
+    if (!db::exists(name))  tui::done_err("Package '" + name + "' is not installed");
     std::cout << db::get_info(name);
 }
 
 static void cmd_owner(const std::string& filepath) {
     if (filepath.empty()) tui::done_err("Provide a file path");
     std::string owner = db::owner_of(filepath);
-    if (!owner.empty()) {
+    if (!owner.empty())
         std::cout << filepath << " → " << owner << "\n";
-    } else {
+    else {
         std::cerr << "No package owns: " << filepath << "\n";
         std::exit(1);
     }
 }
 
 static void cmd_sysinfo() {
+    cmd_version();
+    std::cout << "\n";
     auto pkgs = db::list_all();
-    std::cout << "WARP Package Manager 0.1.0\n";
-    std::cout << "DB:       " << db::db_root.string() << "\n";
-    std::cout << "Packages: " << pkgs.size() << " installed\n";
+    struct utsname un{};
+    uname(&un);
+    std::cout << "Arch:     " << un.machine << "\n"
+              << "Kernel:   " << un.release << "\n"
+              << "DB:       " << db::db_root.string() << "\n"
+              << "Packages: " << pkgs.size() << " installed\n";
+}
+
+// Collect args skipping flags like -q
+static std::vector<std::string> pkg_args(int argc, char* argv[], int start) {
+    std::vector<std::string> result;
+    for (int i = start; i < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "-q") continue;
+        result.push_back(a);
+    }
+    return result;
+}
+
+static void run_queue(const std::vector<std::string>& pkgs,
+                      const std::string& action_label,
+                      const std::function<void(const std::string&)>& fn) {
+    int total = static_cast<int>(pkgs.size());
+    if (total == 1) { fn(pkgs[0]); return; }
+
+    tui::queue_mode = true;
+    for (int i = 0; i < total; ++i) {
+        tui::queue_msg(">>> " + action_label + " (" + std::to_string(i+1) +
+                       " of " + std::to_string(total) + ") " + pkgs[i]);
+        fn(pkgs[i]);
+        tui::queue_msg(">>> Completed (" + std::to_string(i+1) +
+                       " of " + std::to_string(total) + ") " + pkgs[i]);
+    }
+    tui::queue_mode = false;
+    tui::done_ok();
 }
 
 int main(int argc, char* argv[]) {
     std::setlocale(LC_ALL, "C.UTF-8");
-
     if (argc < 2) { usage(); return 0; }
 
-    // Check for quiet flag early
     for (int i = 1; i < argc; ++i)
         if (std::string(argv[i]) == "-q") tui::quiet = true;
 
     config::load();
+    if (config::cfg.quiet)  tui::quiet     = true;
+    if (!config::cfg.color) tui::use_color = false;
 
-    // Apply config to tui
-    if (config::cfg.quiet)   tui::quiet        = true;
-    if (!config::cfg.color)  tui::use_color    = false;
-    if (!config::cfg.progress) tui::use_progress = false;
-
-    // Init DB
     std::string db_path = config::cfg.cache_dir + "/db";
     if (const char* e = getenv("WARP_DB")) db_path = e;
     db::init(db_path);
 
     std::string cmd = argv[1];
 
-    if      (cmd == "-i")               { cmd_install_local(argc > 2 ? argv[2] : ""); }
-    else if (cmd == "-G")               { repo::install(argc > 2 ? argv[2] : ""); tui::println(""); tui::done_ok(); }
-    else if (cmd == "-D")               { cmd_remove(argc > 2 ? argv[2] : "", false); }
-    else if (cmd == "-DD")              { cmd_remove(argc > 2 ? argv[2] : "", true); }
-    else if (cmd == "-A")               { cmd_list(); }
-    else if (cmd == "-s")               { cmd_info(argc > 2 ? argv[2] : ""); }
-    else if (cmd == "-S")               { cmd_owner(argc > 2 ? argv[2] : ""); }
-    else if (cmd == "-ls")              { repo::search(argc > 2 ? argv[2] : ""); }
-    else if (cmd == "-U")               { tui::done_err("Upgrade not yet implemented"); }
-    else if (cmd == "-LU")              { tui::done_err("List updates not yet implemented"); }
-    else if (cmd == "-cP")              { build::create_pkg(argc > 2 ? argv[2] : ""); tui::println(""); tui::done_ok(); }
-    else if (cmd == "--sync")           { repo::sync(); tui::println(""); tui::done_ok(); }
-    else if (cmd == "-info")            { cmd_sysinfo(); }
+    if (cmd == "-i") {
+        cmd_install_local(argc > 2 ? argv[2] : "");
+    } else if (cmd == "-G") {
+        auto pkgs = pkg_args(argc, argv, 2);
+        run_queue(pkgs, "Fetching", [](const std::string& p){ repo::install(p); });
+    } else if (cmd == "-D") {
+        auto pkgs = pkg_args(argc, argv, 2);
+        run_queue(pkgs, "Removing", [](const std::string& p){ cmd_remove(p, false); });
+    } else if (cmd == "-DD") {
+        auto pkgs = pkg_args(argc, argv, 2);
+        run_queue(pkgs, "Removing", [](const std::string& p){ cmd_remove(p, true); });
+    } else if (cmd == "-DC") {
+        diag::remove_cache(argc > 2 ? argv[2] : "");
+    } else if (cmd == "-DA") {
+        std::string name = argc > 2 ? argv[2] : "";
+        cmd_remove(name, true);
+        diag::remove_cache(name);
+        tui::done_ok();
+    } else if (cmd == "-A")       { cmd_list(); }
+    else if (cmd == "-s")         { cmd_info(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "-S")         { cmd_owner(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "-ls")        { repo::search(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "-U")         { repo::upgrade(); }
+    else if (cmd == "-LU")        { repo::list_updates(); }
+    else if (cmd == "-cP")        { build::create_pkg(argc > 2 ? argv[2] : ""); tui::done_ok(); }
+    else if (cmd == "--sync")     { repo::sync(); tui::println(""); tui::done_ok(); }
+    else if (cmd == "--fix")      { diag::fix(); }
+    else if (cmd == "--check")    { diag::check(); }
+    else if (cmd == "--orphans")  { diag::orphans(); }
+    else if (cmd == "--log")      { diag::show_log(); }
+    else if (cmd == "--rollback") { diag::rollback(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "--verify")   { diag::verify(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "--push")     { diag::push(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "--version")  { cmd_version(); }
+    else if (cmd == "-info")      { cmd_sysinfo(); }
     else if (cmd == "-help" || cmd == "--help" || cmd == "-h") { usage(); }
-    else if (cmd == "-q")               { usage(); }
+    else if (cmd == "-q")         { usage(); }
     else {
         std::cerr << "Unknown option: " << cmd << "\n";
         usage();

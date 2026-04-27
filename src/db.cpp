@@ -10,6 +10,10 @@ namespace db {
 namespace fs = std::filesystem;
 fs::path db_root;
 
+static fs::path log_path() {
+    return db_root.parent_path() / "warp.log";
+}
+
 void init(const fs::path& path) {
     db_root = path;
     fs::create_directories(db_root);
@@ -57,6 +61,15 @@ std::string get_info(const std::string& name) {
                        std::istreambuf_iterator<char>());
 }
 
+std::string get_version(const std::string& name) {
+    std::ifstream f(db_root / name / "WARPINFO");
+    std::string line;
+    while (std::getline(f, line))
+        if (line.rfind("version=", 0) == 0)
+            return line.substr(8);
+    return "";
+}
+
 std::vector<std::string> get_files(const std::string& name) {
     std::vector<std::string> result;
     std::ifstream f(db_root / name / "FILES");
@@ -67,6 +80,14 @@ std::vector<std::string> get_files(const std::string& name) {
     return result;
 }
 
+std::string get_deps(const std::string& name) {
+    std::ifstream f(db_root / name / "DEPS");
+    if (!f.is_open()) return "";
+    std::string line;
+    std::getline(f, line);
+    return line;
+}
+
 void remove(const std::string& name) {
     fs::remove_all(db_root / name);
 }
@@ -74,21 +95,23 @@ void remove(const std::string& name) {
 std::vector<PkgEntry> list_all() {
     std::vector<PkgEntry> result;
     if (!fs::is_directory(db_root)) return result;
-
     for (const auto& entry : fs::directory_iterator(db_root)) {
         if (!entry.is_directory()) continue;
         PkgEntry pkg;
         pkg.name = entry.path().filename().string();
-
-        std::ifstream info(entry.path() / "WARPINFO");
-        std::string line;
-        while (std::getline(info, line)) {
-            if (line.rfind("version=", 0) == 0)
-                pkg.version = line.substr(8);
-        }
+        pkg.version = get_version(pkg.name);
         if (pkg.version.empty()) pkg.version = "unknown";
         result.push_back(std::move(pkg));
     }
+    return result;
+}
+
+std::vector<std::string> list_names() {
+    std::vector<std::string> result;
+    if (!fs::is_directory(db_root)) return result;
+    for (const auto& entry : fs::directory_iterator(db_root))
+        if (entry.is_directory())
+            result.push_back(entry.path().filename().string());
     return result;
 }
 
@@ -96,14 +119,26 @@ std::string owner_of(const std::string& filepath) {
     if (!fs::is_directory(db_root)) return "";
     for (const auto& pkg_dir : fs::directory_iterator(db_root)) {
         if (!pkg_dir.is_directory()) continue;
-        auto files_path = pkg_dir.path() / "FILES";
-        std::ifstream f(files_path);
+        std::ifstream f(pkg_dir.path() / "FILES");
         std::string line;
         while (std::getline(f, line))
             if (line == filepath)
                 return pkg_dir.path().filename().string();
     }
     return "";
+}
+
+void log(const std::string& action, const std::string& pkg, const std::string& version) {
+    fs::path lp = log_path();
+    fs::create_directories(lp.parent_path());
+    std::ofstream f(lp, std::ios::app);
+    std::ostringstream ss;
+    ss << std::left
+       << std::setw(20) << now_iso()
+       << std::setw(12) << action
+       << std::setw(25) << pkg
+       << version << "\n";
+    f << ss.str();
 }
 
 } // namespace db
