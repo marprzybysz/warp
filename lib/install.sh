@@ -89,11 +89,9 @@ install_warp_pkg() {
     fi
 
     progress_bar 100 ""
-    clear_progress
     db_log "install" "$name" "$version"
     rm -rf "$tmpdir"
-
-    [[ $QUIET -eq 0 ]] && echo -e "${GREEN}${BOLD}Done!${RESET}"
+    done_ok
 }
 
 install_tarxz_pkg() {
@@ -143,9 +141,7 @@ install_tarxz_pkg() {
     db_save "$name" "$version" "tarxz" "$installed_files"
 
     progress_bar 100 ""
-    clear_progress
     db_log "install" "$name" "$version"
     rm -rf "$tmpdir"
-
-    [[ $QUIET -eq 0 ]] && echo -e "${GREEN}${BOLD}Done!${RESET}"
+    done_ok
 }

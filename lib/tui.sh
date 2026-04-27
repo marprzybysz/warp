@@ -13,59 +13,91 @@ BG_MAGENTA='\033[45m'
 FG_BLACK='\033[30m'
 
 QUIET=0
+_PROGRESS_PCT=-1  # -1 = no active progress bar
+
+_term_width()  { tput cols  2>/dev/null || echo 80; }
+_term_height() { tput lines 2>/dev/null || echo 24; }
+
+_draw_bar() {
+    local pct="$1"
+    local tw
+    tw=$(_term_width)
+    local prefix="Progress:${pct}% "
+    local bar_width=$(( tw - ${#prefix} - 3 ))
+    [[ $bar_width -lt 10 ]] && bar_width=10
+    local filled=$(( pct * bar_width / 100 ))
+    [[ $filled -lt 0 ]]        && filled=0
+    [[ $filled -gt $bar_width ]] && filled=$bar_width
+    local bar="" empty="" i
+    for (( i=0; i<filled; i++ ));           do bar+="#";   done
+    for (( i=filled; i<bar_width; i++ ));   do empty+=" "; done
+    printf "%s[%s%s]" "$prefix" "$bar" "$empty"
+}
+
+progress_bar() {
+    [[ $QUIET -eq 1 ]] && return
+    local pct="$1"
+    [[ $pct -lt 0 ]]   && pct=0
+    [[ $pct -gt 100 ]] && pct=100
+    _PROGRESS_PCT=$pct
+
+    local th
+    th=$(_term_height)
+    # save cursor → go to last line → clear line → draw → restore cursor
+    printf "\033[s\033[%d;1H\033[2K%s\033[u" "$th" "$(_draw_bar "$pct")"
+}
+
+_redraw_bar() {
+    [[ $_PROGRESS_PCT -lt 0 ]] && return
+    local th
+    th=$(_term_height)
+    printf "\033[s\033[%d;1H\033[2K%s\033[u" "$th" "$(_draw_bar "$_PROGRESS_PCT")"
+}
+
+_erase_bar() {
+    [[ $_PROGRESS_PCT -lt 0 ]] && return
+    local th
+    th=$(_term_height)
+    printf "\033[s\033[%d;1H\033[2K\033[u" "$th"
+}
+
+clear_progress() {
+    [[ $QUIET -eq 1 ]] && return
+    _erase_bar
+    _PROGRESS_PCT=-1
+}
 
 log_step() {
     [[ $QUIET -eq 1 ]] && return
     local msg="$1"
     local status="${2:-}"
+
+    _erase_bar
     case "$status" in
         ok)   printf "%-45s ${GREEN}✓${RESET}\n" "$msg" ;;
         err)  printf "%-45s ${RED}✗${RESET}\n" "$msg" ;;
         warn) printf "  ${YELLOW}⚠ %s${RESET}\n" "$msg" ;;
         *)    printf "%s\n" "$msg" ;;
     esac
-}
-
-progress_bar() {
-    [[ $QUIET -eq 1 ]] && return
-    local percent="$1"
-    local action="$2"
-    local term_width
-    term_width=$(tput cols 2>/dev/null || echo 80)
-    # Format: "Progress:75% [######          ]"
-    local prefix="Progress:${percent}% "
-    local bar_width=$(( term_width - ${#prefix} - 3 ))
-    [[ $bar_width -lt 10 ]] && bar_width=10
-    local filled=$(( percent * bar_width / 100 ))
-    [[ $filled -lt 0 ]] && filled=0
-    [[ $filled -gt $bar_width ]] && filled=$bar_width
-    local bar=""
-    local i
-    for (( i=0; i<filled; i++ )); do bar+="#"; done
-    local empty=""
-    for (( i=filled; i<bar_width; i++ )); do empty+=" "; done
-    printf "\r%s[%s%s]" "$prefix" "$bar" "$empty"
-}
-
-clear_progress() {
-    [[ $QUIET -eq 1 ]] && return
-    local term_width
-    term_width=$(tput cols 2>/dev/null || echo 80)
-    printf "\r%*s\r" "$term_width" ""
+    _redraw_bar
 }
 
 done_ok() {
-    echo -e "${GREEN}${BOLD}Gotowe${RESET}"
+    clear_progress
+    printf "${GREEN}${BOLD}Done!${RESET}\n"
 }
 
 done_err() {
-    echo -e "${RED}ERROR: $1${RESET}" >&2
+    clear_progress
+    printf "${RED}ERROR: %s${RESET}\n" "$1" >&2
     exit 1
 }
 
 warn() {
     [[ $QUIET -eq 1 ]] && return
-    echo -e "${YELLOW}⚠ $1${RESET}"
+    _erase_bar
+    printf "${YELLOW}⚠ %s${RESET}\n" "$1"
+    _redraw_bar
 }
 
 format_size() {
