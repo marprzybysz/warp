@@ -29,3 +29,4 @@ target_compile_options(warp PRIVATE -Wall -Wextra -Wpedantic)
 
 install(TARGETS warp RUNTIME DESTINATION bin)
 install(FILES conf/warp.conf DESTINATION /etc/warp)
+install(FILES man/warp.1 DESTINATION share/man/man1)

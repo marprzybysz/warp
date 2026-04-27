@@ -43,6 +43,7 @@ repo_index_get() {
 
 repo_install() {
     local pkg="$1"
+    local skip_confirm="${2:-0}"
     [[ -z "$pkg" ]] && done_err "Provide a package name"
 
     local index="$WARP_INDEX_DIR/INDEX"
@@ -97,7 +98,7 @@ repo_install() {
         log_step "SHA256 OK..." ok
     fi
 
-    install_warp_pkg "$cached"
+    install_warp_pkg "$cached" "$skip_confirm"
 }
 
 _curl_progress() {

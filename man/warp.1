@@ -1,0 +1,209 @@
+.TH WARP 1 "2026" "WARP 0.1.0" "Warp Archive Repository Packager"
+.SH NAME
+warp \- Warp Archive Repository Packager for Flow Linux
+.SH SYNOPSIS
+.B warp
+[\fIOPTIONS\fR] [\fIPACKAGE\fR...]
+.SH DESCRIPTION
+.B WARP
+is the native package manager for Flow Linux. It handles installing,
+removing, building, and querying packages in the
+.B .wrp
+format, as well as raw
+.B .tar.xz
+archives.
+.PP
+Copyright (C) 2026 Marcin Przybysz. License: GPL-2.0.
+.SH PACKAGE MANAGEMENT
+.TP
+.BR \-G " \fIpkg\fR [\fIpkg\fR...]"
+Install one or more packages from the configured repository.
+.TP
+.BR \-i " \fIfile\fR|\fIfolder\fR"
+Install a package locally from a
+.B .wrp
+file, a
+.B .tar.xz
+archive, or a folder.
+.TP
+.BR \-D " \fIpkg\fR [\fIpkg\fR...]"
+Remove one or more installed packages.
+.TP
+.BR \-DD " \fIpkg\fR [\fIpkg\fR...]"
+Remove packages and their dependencies.
+.TP
+.BR \-DC " \fIpkg\fR"
+Remove cached files for a package.
+.TP
+.BR \-DA " \fIpkg\fR"
+Remove package, its dependencies, and cached files.
+.SH UPDATES
+.TP
+.B \-\-sync
+Synchronize the repository index from the configured repo URL.
+.TP
+.B \-U
+Upgrade all installed packages to the latest available versions.
+.TP
+.B \-LU
+List packages that have updates available.
+.SH QUERY
+.TP
+.B \-A
+List all installed packages with their versions.
+.TP
+.BR \-s " \fIpkg\fR"
+Show detailed information about an installed package.
+.TP
+.BR \-S " \fIfile\fR"
+Show which package owns the given file.
+.TP
+.BR \-ls " \fIquery\fR"
+Search the repository index for packages matching the query.
+.SH BUILDING
+.TP
+.BR \-cP " \fIfolder\fR"
+Build a
+.B .wrp
+package from a binary folder. Automatically detects dependencies via
+.BR ldd (1).
+.TP
+.BR \-build " \fIfolder\fR"
+Build a
+.B .wrp
+package from source using a
+.B WARPBUILD
+file.
+.TP
+.BR \-buildI " \fIfolder\fR"
+Build from source and install immediately.
+.TP
+.BR \-\-verify " \fIfile\fR"
+Verify the SHA256 checksum of a
+.B .wrp
+file against its
+.B .sha256
+sidecar.
+.TP
+.BR \-\-push " \fIfile\fR"
+Upload a
+.B .wrp
+package to the configured repository server.
+.SH DIAGNOSTICS
+.TP
+.B \-\-check
+Verify that all files of every installed package are present on disk.
+.TP
+.B \-\-fix
+Check dependencies of all installed packages and report missing ones.
+.TP
+.B \-\-orphans
+List installed packages that are not required by any other package.
+.TP
+.B \-\-log
+Show the history of install, remove, and upgrade operations.
+.TP
+.BR \-\-rollback " \fIpkg\fR"
+Revert a package to its previously cached version.
+.SH SYSTEM
+.TP
+.B \-\-version
+Print WARP version, copyright, and license information.
+.TP
+.B \-info
+Print WARP version, system architecture, kernel, and package count.
+.TP
+.B \-q
+Quiet mode: suppress verbose log output. Progress bar and errors are
+still shown. This flag can appear anywhere in the command line.
+.TP
+.BR \-help ", " \-\-help ", " \-h
+Show usage summary.
+.SH PACKAGE FORMAT
+A
+.B .wrp
+file is a
+.B tar.xz
+archive with the following structure:
+.PP
+.nf
+package.wrp
+├── WARPINFO     # name, version, arch, deps, license, description
+├── DEPS         # comma-separated dependency list
+├── INSTALL      # optional pre/post-install script
+├── REMOVE       # optional pre/post-remove script
+└── files/       # files to install, rooted at /
+.fi
+.SH WARPBUILD
+A
+.B WARPBUILD
+file describes how to build a package from source:
+.PP
+.nf
+pkgname=hello
+pkgver=2.12
+arch=x86_64
+deps=glibc
+makedeps=gcc,make
+source=https://example.org/hello-2.12.tar.gz
+sha256=<checksum>
+
+build() {
+    ./configure --prefix=/usr
+    make
+}
+
+package() {
+    make install DESTDIR="$DESTDIR"
+}
+.fi
+.SH FILES
+.TP
+.I /etc/warp/warp.conf
+System-wide configuration file.
+.TP
+.I /var/lib/warp/db/
+Package database. Each installed package has a subdirectory containing
+.BR WARPINFO ", " FILES ", and " SOURCE .
+.TP
+.I /var/lib/warp/warp.log
+Operation log (install, remove, upgrade, rollback).
+.TP
+.I /var/cache/warp/index/INDEX
+Cached repository index, updated by
+.BR \-\-sync .
+.TP
+.I /var/cache/warp/packages/
+Cached downloaded
+.B .wrp
+files.
+.SH EXAMPLES
+.TP
+Install firefox from repository:
+.B warp -G firefox
+.TP
+Install multiple packages:
+.B warp -G firefox btop tmux neofetch
+.TP
+Install a local package:
+.B warp -i firefox-92.0-x86_64.wrp
+.TP
+Remove a package:
+.B warp -D firefox
+.TP
+Build a package from source:
+.B warp -build ./my-package/
+.TP
+Search for a package:
+.B warp -ls browser
+.TP
+Check system integrity:
+.B warp --check
+.SH SEE ALSO
+.BR tar (1),
+.BR sha256sum (1),
+.BR ldd (1)
+.SH AUTHORS
+Marcin Przybysz <marprzybysz888@gmail.com>
+.PP
+Contributions by Claude Sonnet (Anthropic).

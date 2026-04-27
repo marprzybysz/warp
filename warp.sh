@@ -187,12 +187,25 @@ case "$1" in
              if [[ $total -eq 1 ]]; then
                  repo_install "${pkgs[0]}"
              else
+                 if [[ $QUIET -eq 0 ]]; then
+                     echo ""
+                     echo "The following packages will be installed:"
+                     for pkg in "${pkgs[@]}"; do
+                         printf "  %s\n" "$pkg"
+                     done
+                     echo ""
+                     printf "Do you want to continue? [Y/n] "
+                     read -r _ans; _ans="${_ans:-Y}"
+                     if [[ "$_ans" != "Y" && "$_ans" != "y" ]]; then
+                         echo "Aborted."; exit 0
+                     fi
+                     echo ""
+                 fi
                  _WARP_QUEUE=1
                  for (( _qi=0; _qi<total; _qi++ )); do
                      _qn=$(( _qi+1 ))
-                     echo ""
                      queue_msg ">>> Fetching ($_qn of $total) ${pkgs[$_qi]}"
-                     repo_install "${pkgs[$_qi]}"
+                     repo_install "${pkgs[$_qi]}" 1
                      queue_msg ">>> Completed ($_qn of $total) ${pkgs[$_qi]}"
                  done
                  _WARP_QUEUE=0

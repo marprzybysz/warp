@@ -5,6 +5,7 @@ INSTALL_PREFIX="${INSTALL_PREFIX:-}"
 
 install_warp_pkg() {
     local file="$1"
+    local skip_confirm="${2:-0}"
 
     local size
     size=$(format_size "$file")
@@ -15,15 +16,46 @@ install_warp_pkg() {
     local info="$tmpdir/WARPINFO"
     [[ -f "$info" ]] || { rm -rf "$tmpdir"; done_err "WARPINFO missing from package"; }
 
-    local name version
-    name=$(grep '^name=' "$info" | cut -d= -f2)
+    local name version deps_str
+    name=$(grep '^name='    "$info" | cut -d= -f2)
     version=$(grep '^version=' "$info" | cut -d= -f2)
+    deps_str=$(grep '^deps='   "$info" | cut -d= -f2)
+
+    # Confirmation prompt (skip in quiet mode or if called from queue)
+    if [[ $QUIET -eq 0 && $skip_confirm -eq 0 ]]; then
+        echo ""
+        echo "The following package will be installed:"
+        printf "  %-30s %-12s %s\n" "$name" "$version" "[${size:-?}]"
+        if [[ -n "$deps_str" ]]; then
+            echo ""
+            echo "Dependencies:"
+            IFS=',' read -ra dep_arr <<< "$deps_str"
+            for dep in "${dep_arr[@]}"; do
+                dep="${dep// /}"
+                [[ -z "$dep" ]] && continue
+                if db_exists "$dep"; then
+                    printf "  %-30s %s\n" "$dep" "(already installed)"
+                else
+                    printf "  %-30s %s\n" "$dep" "(will be installed)"
+                fi
+            done
+        fi
+        echo ""
+        printf "Do you want to continue? [Y/n] "
+        local answer
+        read -r answer
+        answer="${answer:-Y}"
+        if [[ "$answer" != "Y" && "$answer" != "y" ]]; then
+            rm -rf "$tmpdir"
+            echo "Aborted."
+            return 1
+        fi
+        echo ""
+    fi
 
     [[ $QUIET -eq 0 ]] && printf "Selecting %s %s [%s]\n" "$name" "$version" "${size:-?}"
 
-    # Step weights: extract=10, metadata=20, deps=35, install_script=50, files=50-90, register=95
     progress_bar 10 ""
-
     progress_bar 20 ""
 
     # Check deps
