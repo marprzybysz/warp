@@ -165,9 +165,9 @@ done
 
 case "$1" in
     -i)      cmd_install_local "$2" ;;
-    -G)      repo_install "$2" ;;
-    -D)      cmd_remove "$2" 0 ;;
-    -DD)     cmd_remove "$2" 1 ;;
+    -G)      shift; for pkg in "$@"; do repo_install "$pkg"; done ;;
+    -D)      shift; for pkg in "$@"; do cmd_remove "$pkg" 0; done ;;
+    -DD)     shift; for pkg in "$@"; do cmd_remove "$pkg" 1; done ;;
     -A)      cmd_list ;;
     -s)      cmd_info "$2" ;;
     -S)      cmd_owner "$2" ;;
