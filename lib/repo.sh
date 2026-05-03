@@ -5,6 +5,9 @@ WARP_CACHE="${WARP_CACHE:-/var/cache/warp}"
 WARP_INDEX_DIR="$WARP_CACHE/index"
 WARP_PKG_CACHE="$WARP_CACHE/packages"
 
+# Guard against circular deps across recursive repo_install calls
+declare -A _WARP_INSTALLING=()
+
 repo_sync() {
     local repo_url="${CFG_REPO:-https://repo.flow.org/core}"
     mkdir -p "$WARP_INDEX_DIR" "$WARP_PKG_CACHE"
@@ -51,14 +54,9 @@ repo_install() {
 
     grep -q "^\[$pkg\]" "$index" || done_err "Package '$pkg' not found in repository"
 
-    local version file sha256 repo_url
+    # Short-circuit: already installed at this version
+    local version
     version=$(repo_index_get "$pkg" "version")
-    file=$(repo_index_get "$pkg" "file")
-    sha256=$(repo_index_get "$pkg" "sha256")
-    repo_url="${CFG_REPO:-https://repo.flow.org/core}"
-
-    log_step "Found: $pkg $version" ok
-
     if db_exists "$pkg"; then
         local installed_ver
         installed_ver=$(grep '^version=' "$WARP_DB/$pkg/WARPINFO" 2>/dev/null | cut -d= -f2)
@@ -67,6 +65,42 @@ repo_install() {
             return 0
         fi
     fi
+
+    # Guard against circular dependency loops
+    if [[ -n "${_WARP_INSTALLING[$pkg]:-}" ]]; then
+        warn "Circular dependency detected: $pkg — skipping"
+        return 0
+    fi
+    _WARP_INSTALLING[$pkg]=1
+
+    # Resolve and install dependencies before the main package
+    local deps_str
+    deps_str=$(repo_index_get "$pkg" "deps")
+    if [[ -n "$deps_str" ]]; then
+        IFS=',' read -ra _dep_list <<< "$deps_str"
+        for _dep in "${_dep_list[@]}"; do
+            _dep="${_dep// /}"
+            [[ -z "$_dep" ]] && continue
+            if db_exists "$_dep"; then
+                log_step "Dependency $_dep already satisfied..." ok
+            elif grep -q "^\[$_dep\]" "$index"; then
+                log_step "Installing dependency: $_dep"
+                repo_install "$_dep" 1
+            elif ldconfig -p 2>/dev/null | grep -q "^[[:space:]]*lib${_dep}\.so"; then
+                log_step "Dependency $_dep satisfied by system..." ok
+                db_save "$_dep" "system" "system"
+            else
+                warn "Dependency '$_dep' not found in repository or system — package may not work"
+            fi
+        done
+    fi
+
+    log_step "Found: $pkg $version" ok
+
+    local file sha256 repo_url
+    file=$(repo_index_get "$pkg" "file")
+    sha256=$(repo_index_get "$pkg" "sha256")
+    repo_url="${CFG_REPO:-https://repo.flow.org/core}"
 
     local cached="$WARP_PKG_CACHE/$(basename "$file")"
     if [[ -f "$cached" ]]; then
@@ -99,6 +133,7 @@ repo_install() {
     fi
 
     install_warp_pkg "$cached" "$skip_confirm"
+    unset "_WARP_INSTALLING[$pkg]"
 }
 
 _curl_progress() {
@@ -199,4 +234,71 @@ repo_search() {
         desc=$(repo_index_get "$pkg" "description")
         printf "%-25s %-12s %s\n" "$pkg" "${ver:-?}" "${desc:-}"
     done <<< "$results"
+}
+
+cmd_gen_index() {
+    local dir="${1:-.}"
+    [[ -d "$dir" ]] || done_err "Directory not found: $dir"
+
+    local out="$dir/INDEX"
+    local count=0
+
+    log_step "Scanning $dir for .wrp packages..."
+    echo ""
+
+    # Write to a temp file first so a partial run doesn't corrupt the existing INDEX
+    local tmp
+    tmp=$(mktemp /tmp/warp-index.XXXXXX)
+
+    while IFS= read -r wrp; do
+        local tmpdir
+        tmpdir=$(mktemp -d /tmp/warp-idx.XXXXXX)
+
+        # Extract only WARPINFO from the archive (fast — no full unpack)
+        tar -xJf "$wrp" -C "$tmpdir" ./WARPINFO 2>/dev/null \
+            || tar -xJf "$wrp" -C "$tmpdir" WARPINFO 2>/dev/null \
+            || { rm -rf "$tmpdir"; warn "Cannot read WARPINFO from $(basename "$wrp") — skipping"; continue; }
+
+        local info="$tmpdir/WARPINFO"
+        [[ -f "$info" ]] || { rm -rf "$tmpdir"; warn "WARPINFO missing in $(basename "$wrp") — skipping"; continue; }
+
+        local name version arch deps description
+        name=$(grep '^name='        "$info" | cut -d= -f2)
+        version=$(grep '^version='  "$info" | cut -d= -f2)
+        arch=$(grep '^arch='        "$info" | cut -d= -f2)
+        deps=$(grep '^deps='        "$info" | cut -d= -f2)
+        description=$(grep '^description=' "$info" | cut -d= -f2)
+        rm -rf "$tmpdir"
+
+        [[ -z "$name" || -z "$version" ]] && { warn "Incomplete WARPINFO in $(basename "$wrp") — skipping"; continue; }
+
+        local relpath sha256 size
+        relpath="packages/$(basename "$wrp")"
+        sha256=$(sha256sum "$wrp" | cut -d' ' -f1)
+        size=$(stat -c%s "$wrp" 2>/dev/null || stat -f%z "$wrp" 2>/dev/null || echo 0)
+
+        {
+            echo "[$name]"
+            echo "version=$version"
+            echo "arch=${arch:-x86_64}"
+            [[ -n "$deps" ]]        && echo "deps=$deps"
+            [[ -n "$description" ]] && echo "description=$description"
+            echo "file=$relpath"
+            echo "sha256=$sha256"
+            echo "size=$size"
+            echo ""
+        } >> "$tmp"
+
+        log_step "$name $version" ok
+        count=$(( count + 1 ))
+    done < <(find "$dir/packages" -maxdepth 1 -name "*.wrp" 2>/dev/null | sort)
+
+    if [[ $count -eq 0 ]]; then
+        rm -f "$tmp"
+        done_err "No .wrp files found in $dir/packages/"
+    fi
+
+    mv "$tmp" "$out"
+    echo ""
+    log_step "Written: $out ($count packages)" ok
 }
