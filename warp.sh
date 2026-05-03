@@ -57,6 +57,7 @@ Repositories:
   repo --add <url>   Add a repository
   repo --remove <n>  Remove a repository
   repo --info <n>    Show repository details
+  repo --gen-index <dir>  Generate INDEX from packages/ subfolder
 
 Diagnostics:
   --fix              Repair broken dependencies
@@ -160,6 +161,12 @@ cmd_sysinfo() {
     [[ -d "$WARP_DB" ]] && count=$(find "$WARP_DB" -maxdepth 1 -mindepth 1 -type d | wc -l)
     echo "Packages: $count installed"
 }
+
+# --- Auto-init przy pierwszym uruchomieniu ---
+
+if [[ ! -f /var/lib/warp/.initialized && "$EUID" -eq 0 ]]; then
+    cmd_scan_system 1
+fi
 
 # --- Parsowanie argumentów ---
 
@@ -265,6 +272,13 @@ case "$1" in
     --rollback) cmd_rollback "$2" ;;
     --verify) cmd_verify "$2" ;;
     --push)  cmd_push "$2" ;;
+    --scan-system) cmd_scan_system ;;
+    repo)
+        case "$2" in
+            --gen-index) cmd_gen_index "${3:-.}" && echo "" && done_ok ;;
+            --list|--add|--remove|--info) warn "Not yet implemented: warp repo $2" ;;
+            *) done_err "Unknown repo subcommand: $2" ;;
+        esac ;;
     -info)      cmd_sysinfo ;;
     --version)  cmd_version ;;
     -help|--help|-h) usage ;;
