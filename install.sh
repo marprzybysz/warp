@@ -68,5 +68,35 @@ mkdir -p /var/lib/warp/db /var/cache/warp/index /var/cache/warp/packages
 echo "  /var/lib/warp/db"
 echo "  /var/cache/warp"
 
+# System library scan — register pre-existing libs so dep resolution works
+echo ""
+echo "Scanning system libraries..."
+_warp_scan_count=0
+declare -A _warp_seen=()
+while IFS= read -r _line; do
+    _soname=$(awk '{print $1}' <<< "$_line")
+    [[ "$_soname" == lib*.so* ]] || continue
+    _name=$(sed 's/^lib//; s/\.so.*//' <<< "$_soname")
+    [[ -z "$_name" ]] && continue
+    [[ -n "${_warp_seen[$_name]:-}" ]] && continue
+    _warp_seen[$_name]=1
+    if [[ "$_soname" =~ \.so\.([0-9][0-9.]*) ]]; then
+        _ver="${BASH_REMATCH[1]}"
+    else
+        _ver="system"
+    fi
+    mkdir -p "/var/lib/warp/db/$_name"
+    cat > "/var/lib/warp/db/$_name/WARPINFO" <<EOF
+name=$_name
+version=$_ver
+installed=$(date +%Y-%m-%dT%H:%M:%S)
+source=system
+EOF
+    echo "system" > "/var/lib/warp/db/$_name/SOURCE"
+    _warp_scan_count=$(( _warp_scan_count + 1 ))
+done < <(ldconfig -p 2>/dev/null | tail -n +2)
+touch /var/lib/warp/.initialized
+echo "  Registered $_warp_scan_count system libraries"
+
 echo ""
 echo "Done! Run: warp --version"

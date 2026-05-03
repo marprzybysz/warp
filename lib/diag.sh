@@ -1,5 +1,57 @@
 #!/usr/bin/env bash
-# Diagnostics: --check, --fix, --orphans, --log, --rollback, -DC, -DA, --verify, --push
+# Diagnostics: --check, --fix, --orphans, --log, --rollback, -DC, -DA, --verify, --push, --scan-system
+
+WARP_INIT_MARKER="/var/lib/warp/.initialized"
+
+cmd_scan_system() {
+    local auto="${1:-0}"
+
+    [[ $auto -eq 1 ]] && echo "First run — scanning system libraries..." || log_step "Scanning system libraries..."
+    echo ""
+
+    db_init
+
+    if ! command -v ldconfig &>/dev/null; then
+        warn "ldconfig not found — skipping system scan"
+        touch "$WARP_INIT_MARKER"
+        return
+    fi
+
+    local count=0
+    declare -A _seen=()
+
+    while IFS= read -r line; do
+        local soname
+        soname=$(awk '{print $1}' <<< "$line")
+        [[ "$soname" == lib*.so* ]] || continue
+
+        local name version
+        name=$(sed 's/^lib//; s/\.so.*//' <<< "$soname")
+        [[ -z "$name" ]] && continue
+        [[ -n "${_seen[$name]:-}" ]] && continue
+        _seen[$name]=1
+
+        if [[ "$soname" =~ \.so\.([0-9][0-9.]*) ]]; then
+            version="${BASH_REMATCH[1]}"
+        else
+            version="system"
+        fi
+
+        # Never overwrite packages installed by WARP itself
+        if db_exists "$name"; then
+            local src
+            src=$(grep '^source=' "$WARP_DB/$name/WARPINFO" 2>/dev/null | cut -d= -f2)
+            [[ "$src" != "system" ]] && continue
+        fi
+
+        db_save "$name" "$version" "system"
+        count=$(( count + 1 ))
+    done < <(ldconfig -p 2>/dev/null | tail -n +2)
+
+    touch "$WARP_INIT_MARKER"
+    log_step "Registered $count system libraries..." ok
+    echo ""
+}
 
 cmd_check() {
     local errors=0
