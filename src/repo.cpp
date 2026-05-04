@@ -13,6 +13,8 @@
 #include <array>
 #include <cstdio>
 #include <curl/curl.h>
+#include <archive.h>
+#include <archive_entry.h>
 
 namespace repo {
 
@@ -339,6 +341,91 @@ void add_repo(const std::string& url) {
 
     std::cout << "Added repo #" << next << ": " << url << "\n";
     std::cout << "Run 'warp --sync' to fetch the package index.\n";
+}
+
+void gen_index(const fs::path& dir) {
+    if (!fs::is_directory(dir))
+        tui::done_err("Not a directory: " + dir.string());
+
+    fs::path out = dir / "INDEX";
+    std::ofstream idx(out);
+    if (!idx) tui::done_err("Cannot write INDEX to: " + out.string());
+
+    int count = 0;
+    for (const auto& entry : fs::directory_iterator(dir)) {
+        if (entry.path().extension() != ".wrp") continue;
+
+        // Extract WARPINFO from archive without full unpack
+        struct archive* a = archive_read_new();
+        archive_read_support_filter_xz(a);
+        archive_read_support_format_tar(a);
+        if (archive_read_open_filename(a, entry.path().c_str(), 10240) != ARCHIVE_OK) {
+            archive_read_free(a);
+            continue;
+        }
+
+        std::string warpinfo_data;
+        struct archive_entry* ae;
+        while (archive_read_next_header(a, &ae) == ARCHIVE_OK) {
+            std::string pname = archive_entry_pathname(ae);
+            if (pname == "./WARPINFO" || pname == "WARPINFO") {
+                std::string chunk;
+                chunk.resize(4096);
+                la_ssize_t n = archive_read_data(a, chunk.data(), chunk.size());
+                if (n > 0) warpinfo_data = chunk.substr(0, static_cast<size_t>(n));
+                break;
+            }
+            archive_read_data_skip(a);
+        }
+        archive_read_free(a);
+
+        if (warpinfo_data.empty()) continue;
+
+        // Parse WARPINFO fields
+        auto get_field = [&](const std::string& key) -> std::string {
+            std::istringstream ss(warpinfo_data);
+            std::string line;
+            while (std::getline(ss, line))
+                if (line.rfind(key + "=", 0) == 0)
+                    return line.substr(key.size() + 1);
+            return "";
+        };
+
+        std::string name    = get_field("name");
+        std::string version = get_field("version");
+        std::string arch    = get_field("arch");
+        std::string deps    = get_field("deps");
+        std::string desc    = get_field("description");
+        std::string license = get_field("license");
+
+        if (name.empty() || version.empty()) continue;
+
+        // SHA256
+        std::array<char, 128> sha_buf{};
+        FILE* sp = popen(("sha256sum " + entry.path().string() + " | cut -d' ' -f1").c_str(), "r");
+        std::string sha;
+        if (sp) { fgets(sha_buf.data(), sha_buf.size(), sp); pclose(sp); sha = sha_buf.data(); }
+        sha.erase(sha.find_last_not_of(" \n\r") + 1);
+
+        uintmax_t size_kb = fs::file_size(entry.path()) / 1024;
+
+        idx << "[" << name << "]\n"
+            << "version="     << version << "\n"
+            << "arch="        << arch    << "\n"
+            << "file="        << entry.path().filename().string() << "\n"
+            << "sha256="      << sha     << "\n"
+            << "size="        << size_kb << "\n"
+            << "deps="        << deps    << "\n"
+            << "license="     << license << "\n"
+            << "description=" << desc    << "\n"
+            << "\n";
+
+        tui::log_step("  " + name + " " + version, "ok");
+        ++count;
+    }
+
+    tui::log_step("Generated INDEX with " + std::to_string(count) + " packages...", "ok");
+    tui::println("File: " + out.string());
 }
 
 void remove_repo(int n) {

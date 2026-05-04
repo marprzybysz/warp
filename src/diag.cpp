@@ -226,4 +226,59 @@ void push(const std::string& path) {
     db::log("push", fname);
 }
 
+void scan_system() {
+    tui::log_step("Scanning system libraries via ldconfig...");
+
+    FILE* p = popen("ldconfig -p 2>/dev/null", "r");
+    if (!p) tui::done_err("ldconfig not found — cannot scan system libraries");
+
+    int count = 0;
+    std::array<char, 512> buf{};
+    bool first = true;
+    while (fgets(buf.data(), buf.size(), p)) {
+        if (first) { first = false; continue; } // skip header line
+        std::string line(buf.data());
+        line.erase(line.find_last_not_of(" \n\r\t") + 1);
+
+        // Format: "\tlib<name>.so.X (libc6,...) => /path"
+        auto tab = line.find('\t');
+        if (tab == std::string::npos) continue;
+        std::string soname = line.substr(tab + 1);
+        auto space = soname.find(' ');
+        if (space != std::string::npos) soname = soname.substr(0, space);
+
+        if (soname.rfind("lib", 0) != 0) continue;
+
+        // Derive name: libfoo.so.1 → foo
+        std::string name = soname.substr(3); // strip "lib"
+        auto dot = name.find(".so");
+        if (dot != std::string::npos) name = name.substr(0, dot);
+        if (name.empty()) continue;
+
+        // Derive version from .so.X
+        std::string ver = "system";
+        auto so_pos = soname.find(".so.");
+        if (so_pos != std::string::npos) ver = soname.substr(so_pos + 4);
+
+        if (db::exists(name)) continue; // don't overwrite user-installed packages
+
+        fs::path pkg_dir = db::db_root / name;
+        fs::create_directories(pkg_dir);
+        { std::ofstream wi(pkg_dir / "WARPINFO");
+          wi << "name="    << name    << "\n"
+             << "version=" << ver     << "\n"
+             << "source=system\n"; }
+        { std::ofstream src(pkg_dir / "SOURCE"); src << "system\n"; }
+
+        ++count;
+    }
+    pclose(p);
+
+    // Mark as initialized
+    fs::path marker = db::db_root.parent_path() / ".initialized";
+    { std::ofstream m(marker); m << "1\n"; }
+
+    tui::log_step("Registered " + std::to_string(count) + " system libraries...", "ok");
+}
+
 } // namespace diag

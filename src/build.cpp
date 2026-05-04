@@ -1,4 +1,5 @@
 #include "build.h"
+#include "install.h"
 #include "tui.h"
 #include <archive.h>
 #include <archive_entry.h>
@@ -9,7 +10,9 @@
 #include <set>
 #include <regex>
 #include <cstdio>
+#include <cstdlib>
 #include <array>
+#include <curl/curl.h>
 
 namespace build {
 
@@ -206,6 +209,228 @@ void create_pkg(const fs::path& src_dir_in) {
     tui::println("");
     tui::println("Size: " + std::to_string(fs::file_size(output) / 1024) + " KB");
     tui::println("File: " + output);
+}
+
+// ─── build_from_source ───────────────────────────────────────────────────────
+
+static size_t curl_write_file(void* ptr, size_t size, size_t nmemb, void* stream) {
+    return fwrite(ptr, size, nmemb, static_cast<FILE*>(stream));
+}
+
+static bool download_source(const std::string& url, const fs::path& dest) {
+    FILE* f = fopen(dest.c_str(), "wb");
+    if (!f) return false;
+    CURL* curl = curl_easy_init();
+    if (!curl) { fclose(f); return false; }
+    curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_file);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA,     f);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION,1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT,       120L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT,     "warp/0.1.0");
+    CURLcode res = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    fclose(f);
+    if (res != CURLE_OK) { fs::remove(dest); return false; }
+    return true;
+}
+
+static std::string sha256_of(const fs::path& file) {
+    std::array<char, 128> buf{};
+    FILE* p = popen(("sha256sum " + file.string() + " | cut -d' ' -f1").c_str(), "r");
+    if (!p) return "";
+    fgets(buf.data(), buf.size(), p);
+    pclose(p);
+    std::string s(buf.data());
+    s.erase(s.find_last_not_of(" \n\r") + 1);
+    return s;
+}
+
+static std::string warpbuild_field(const fs::path& wb, const std::string& key) {
+    std::ifstream f(wb);
+    std::string line;
+    while (std::getline(f, line))
+        if (line.rfind(key + "=", 0) == 0)
+            return line.substr(key.size() + 1);
+    return "";
+}
+
+void build_from_source(const fs::path& dir, bool install_after) {
+    if (!fs::is_directory(dir))
+        tui::done_err("Not a directory: " + dir.string());
+
+    fs::path warpbuild = dir / "WARPBUILD";
+    if (!fs::exists(warpbuild))
+        tui::done_err("WARPBUILD not found in " + dir.string());
+
+    tui::log_step("Reading WARPBUILD...");
+
+    std::string pkgname     = warpbuild_field(warpbuild, "pkgname");
+    std::string pkgver      = warpbuild_field(warpbuild, "pkgver");
+    std::string arch        = warpbuild_field(warpbuild, "arch");
+    std::string deps        = warpbuild_field(warpbuild, "deps");
+    std::string makedeps    = warpbuild_field(warpbuild, "makedeps");
+    std::string license     = warpbuild_field(warpbuild, "license");
+    std::string description = warpbuild_field(warpbuild, "description");
+    std::string source_url  = warpbuild_field(warpbuild, "source");
+    std::string expected_sha = warpbuild_field(warpbuild, "sha256");
+    if (arch.empty()) arch = "x86_64";
+
+    if (pkgname.empty() || pkgver.empty())
+        tui::done_err("pkgname and pkgver are required in WARPBUILD");
+
+    tui::log_step("Package: " + pkgname + " " + pkgver, "ok");
+
+    // Check makedeps
+    if (!makedeps.empty()) {
+        tui::log_step("Checking build dependencies...");
+        std::istringstream ss(makedeps);
+        std::string md;
+        while (std::getline(ss, md, ',')) {
+            md.erase(0, md.find_first_not_of(' '));
+            md.erase(md.find_last_not_of(' ') + 1);
+            if (md.empty()) continue;
+            if (system(("command -v " + md + " >/dev/null 2>&1").c_str()) != 0)
+                tui::done_err("Missing build dep: " + md + " — install it first");
+        }
+        tui::log_step("Build dependencies OK...", "ok");
+    }
+
+    // Workspace
+    fs::path workdir = fs::temp_directory_path() / ("warp-build-src." + std::to_string(getpid()));
+    fs::path srcdir  = workdir / "src";
+    fs::path destdir = workdir / "dest";
+    fs::create_directories(srcdir);
+    fs::create_directories(destdir);
+
+    // Download or copy source
+    if (!source_url.empty()) {
+        if (source_url.rfind("http", 0) == 0) {
+            tui::log_step("Downloading source...");
+            fs::path tarball = workdir / fs::path(source_url).filename();
+            if (!download_source(source_url, tarball)) {
+                fs::remove_all(workdir);
+                tui::done_err("Failed to download: " + source_url);
+            }
+            tui::log_step("Source downloaded...", "ok");
+
+            if (!expected_sha.empty()) {
+                tui::log_step("Verifying checksum...");
+                if (sha256_of(tarball) != expected_sha) {
+                    fs::remove_all(workdir);
+                    tui::done_err("SHA256 mismatch — corrupted source");
+                }
+                tui::log_step("SHA256 OK...", "ok");
+            }
+
+            tui::log_step("Extracting source...");
+            std::string extract_cmd = "tar -xf " + tarball.string() +
+                                      " -C " + srcdir.string() +
+                                      " --strip-components=1 2>/dev/null || "
+                                      "tar -xf " + tarball.string() +
+                                      " -C " + srcdir.string() + " 2>/dev/null";
+            if (system(extract_cmd.c_str()) != 0) {
+                fs::remove_all(workdir);
+                tui::done_err("Failed to extract source");
+            }
+            tui::log_step("Source extracted...", "ok");
+        } else {
+            // Local path
+            fs::path local = dir / source_url;
+            if (fs::is_directory(local))
+                for (const auto& e : fs::directory_iterator(local))
+                    fs::copy(e.path(), srcdir / e.path().filename(), fs::copy_options::recursive);
+            else if (fs::exists(local))
+                system(("tar -xf " + local.string() + " -C " + srcdir.string() + " --strip-components=1 2>/dev/null || tar -xf " + local.string() + " -C " + srcdir.string()).c_str());
+            else {
+                fs::remove_all(workdir);
+                tui::done_err("Source not found: " + local.string());
+            }
+            tui::log_step("Source ready...", "ok");
+        }
+    } else {
+        for (const auto& e : fs::directory_iterator(dir))
+            fs::copy(e.path(), srcdir / e.path().filename(),
+                     fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+        tui::log_step("Using local directory as source...", "ok");
+    }
+
+    // Determine nproc
+    std::array<char, 8> np_buf{};
+    std::string nproc = "1";
+    FILE* np = popen("nproc 2>/dev/null", "r");
+    if (np) { fgets(np_buf.data(), np_buf.size(), np); pclose(np); nproc = np_buf.data(); }
+    nproc.erase(nproc.find_last_not_of(" \n\r") + 1);
+
+    // Set env
+    setenv("DESTDIR",    destdir.c_str(), 1);
+    setenv("PREFIX",     "/usr", 1);
+    setenv("MAKEFLAGS",  ("-j" + nproc).c_str(), 1);
+
+    // Run build()
+    std::string wb_abs = warpbuild.string();
+    tui::log_step("Building...");
+    std::string build_cmd = "cd " + srcdir.string() +
+                            " && source " + wb_abs +
+                            " && build";
+    if (system(("bash -c '" + build_cmd + "'").c_str()) != 0) {
+        fs::remove_all(workdir);
+        tui::done_err("build() function failed");
+    }
+    tui::log_step("Build complete...", "ok");
+
+    // Run package()
+    tui::log_step("Staging files...");
+    std::string pkg_cmd = "cd " + srcdir.string() +
+                          " && source " + wb_abs +
+                          " && package";
+    if (system(("bash -c '" + pkg_cmd + "'").c_str()) != 0) {
+        fs::remove_all(workdir);
+        tui::done_err("package() function failed");
+    }
+    tui::log_step("Files staged...", "ok");
+
+    // Build .wrp structure
+    tui::log_step("Creating package structure...");
+    fs::path staging = workdir / "pkg";
+    fs::create_directories(staging / "files");
+    for (const auto& e : fs::directory_iterator(destdir))
+        fs::copy(e.path(), staging / "files" / e.path().filename(),
+                 fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+
+    {
+        std::ofstream wi(staging / "WARPINFO");
+        wi << "name="        << pkgname     << "\n"
+           << "version="     << pkgver      << "\n"
+           << "arch="        << arch        << "\n"
+           << "deps="        << deps        << "\n"
+           << "license="     << license     << "\n"
+           << "description=" << description << "\n";
+    }
+    { std::ofstream df(staging / "DEPS"); df << deps << "\n"; }
+
+    if (fs::exists(dir / "INSTALL")) fs::copy_file(dir / "INSTALL", staging / "INSTALL", fs::copy_options::overwrite_existing);
+    if (fs::exists(dir / "REMOVE"))  fs::copy_file(dir / "REMOVE",  staging / "REMOVE",  fs::copy_options::overwrite_existing);
+
+    // Pack
+    tui::log_step("Packing .wrp...");
+    std::string output = pkgname + "-" + pkgver + "-" + arch + ".wrp";
+    pack_warp(staging, output);
+
+    std::string sha = sha256_of(output);
+    { std::ofstream sf(output + ".sha256"); sf << sha << "  " << output << "\n"; }
+    tui::log_step("Package ready: " + output, "ok");
+    tui::log_step("SHA256: " + sha.substr(0, 16) + "...", "ok");
+
+    fs::remove_all(workdir);
+
+    tui::println("");
+    tui::println("Size: " + std::to_string(fs::file_size(output) / 1024) + " KB");
+    tui::println("File: " + output);
+    tui::println("");
+
+    if (install_after)
+        ::install::from_warp(fs::path(output));
 }
 
 } // namespace build

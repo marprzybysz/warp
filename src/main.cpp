@@ -213,6 +213,9 @@ int main(int argc, char* argv[]) {
     else if (cmd == "-U")         { repo::upgrade(); }
     else if (cmd == "-LU")        { repo::list_updates(); }
     else if (cmd == "-cP")        { build::create_pkg(argc > 2 ? argv[2] : ""); tui::done_ok(); }
+    else if (cmd == "-build")     { build::build_from_source(argc > 2 ? argv[2] : "", false); tui::done_ok(); }
+    else if (cmd == "-buildI")    { build::build_from_source(argc > 2 ? argv[2] : "", true);  tui::done_ok(); }
+    else if (cmd == "--scan-system") { diag::scan_system(); tui::done_ok(); }
     else if (cmd == "--sync")     { repo::sync(); tui::println(""); tui::done_ok(); }
     else if (cmd == "--fix")      { diag::fix(); }
     else if (cmd == "--check")    { diag::check(); }
@@ -226,7 +229,8 @@ int main(int argc, char* argv[]) {
         if (sub == "--list")                { repo::list_repos(); }
         else if (sub == "--add")            { repo::add_repo(argc > 3 ? argv[3] : ""); }
         else if (sub == "--remove")         { repo::remove_repo(argc > 3 ? std::stoi(argv[3]) : 0); }
-        else { std::cerr << "Usage: warp repo --list | --add <url> | --remove <n>\n"; return 1; }
+        else if (sub == "--gen-index")      { repo::gen_index(argc > 3 ? argv[3] : "."); tui::println(""); tui::done_ok(); }
+        else { std::cerr << "Usage: warp repo --list | --add <url> | --remove <n> | --gen-index <dir>\n"; return 1; }
     } else if (cmd == "--version")  { cmd_version(); }
     else if (cmd == "-info")      { cmd_sysinfo(); }
     else if (cmd == "-help" || cmd == "--help" || cmd == "-h") { usage(); }
