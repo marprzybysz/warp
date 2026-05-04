@@ -150,6 +150,12 @@ static std::string sha256sum_file(const fs::path& file) {
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
+std::pair<std::string, std::string> index_get_any(const std::string& pkg, const std::string& field) {
+    auto repos = load_repos();
+    auto [val, re] = index_get_all(repos, pkg, field);
+    return {val, re.url};
+}
+
 void sync() {
     auto repos = load_repos();
     for (const auto& r : repos) {

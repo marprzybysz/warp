@@ -129,6 +129,23 @@ void println(const std::string& msg) {
     redraw_bar();
 }
 
+std::string format_size_bytes(uintmax_t bytes) {
+    long long kb = static_cast<long long>(bytes) / 1024;
+    if (kb < 1024) {
+        return std::to_string(kb) + " kB";
+    } else if (kb < 1048576) {
+        long long h = kb * 100 / 1024;
+        std::ostringstream ss;
+        ss << (h / 100) << "." << std::setfill('0') << std::setw(2) << (h % 100) << " MB";
+        return ss.str();
+    } else {
+        long long h = kb * 100 / 1048576;
+        std::ostringstream ss;
+        ss << (h / 100) << "." << std::setfill('0') << std::setw(2) << (h % 100) << " GB";
+        return ss.str();
+    }
+}
+
 std::string format_size(const std::string& path) {
     struct stat st{};
     if (::stat(path.c_str(), &st) != 0) return "?";

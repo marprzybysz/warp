@@ -226,6 +226,106 @@ void push(const std::string& path) {
     db::log("push", fname);
 }
 
+void autoremove() {
+    auto all = db::list_names();
+
+    // Collect all deps referenced by any package
+    std::vector<std::string> needed;
+    for (const auto& name : all) {
+        std::string deps_str = db::get_deps(name);
+        std::istringstream ss(deps_str);
+        std::string dep;
+        while (std::getline(ss, dep, ',')) {
+            dep.erase(0, dep.find_first_not_of(' '));
+            dep.erase(dep.find_last_not_of(' ') + 1);
+            if (!dep.empty()) needed.push_back(dep);
+        }
+    }
+
+    // Find packages that are only deps (no one explicitly installed them)
+    // We identify "auto-installed" by SOURCE==repo and not in needed list
+    std::vector<std::string> orphans;
+    for (const auto& name : all) {
+        // Skip system libs
+        fs::path src_file = db::db_root / name / "SOURCE";
+        std::string source;
+        { std::ifstream f(src_file); std::getline(f, source); }
+        if (source == "system") continue;
+
+        bool is_needed = false;
+        for (const auto& d : needed)
+            if (d == name) { is_needed = true; break; }
+        if (!is_needed) continue; // explicitly installed — keep
+
+        // It's a dep — check if anything still needs it
+        bool still_needed = false;
+        for (const auto& other : all) {
+            if (other == name) continue;
+            std::string ds = db::get_deps(other);
+            std::istringstream ss2(ds);
+            std::string d;
+            while (std::getline(ss2, d, ',')) {
+                d.erase(0, d.find_first_not_of(' '));
+                d.erase(d.find_last_not_of(' ') + 1);
+                if (d == name) { still_needed = true; break; }
+            }
+            if (still_needed) break;
+        }
+        if (!still_needed) orphans.push_back(name);
+    }
+
+    if (orphans.empty()) { std::cout << "Nothing to remove.\n"; return; }
+
+    std::cout << "\nThe following packages are no longer needed:\n";
+    for (const auto& o : orphans) printf("  %s\n", o.c_str());
+    std::cout << "\n";
+
+    if (!tui::quiet) {
+        printf("Remove them? [Y/n] ");
+        std::string ans; std::getline(std::cin, ans);
+        if (ans != "Y" && ans != "y" && !ans.empty()) { std::cout << "Aborted.\n"; return; }
+    }
+
+    for (const auto& o : orphans) {
+        tui::log_step("Removing " + o + "...");
+        remove_pkg::remove(o, false);
+    }
+    tui::done_ok();
+}
+
+void clean_cache() {
+    fs::path cache = pkg_cache();
+    if (!fs::is_directory(cache)) { std::cout << "Cache is empty.\n"; return; }
+
+    uintmax_t total_size = 0;
+    int count = 0;
+    for (const auto& e : fs::directory_iterator(cache)) {
+        if (e.path().extension() == ".wrp" ||
+            e.path().extension() == ".sha256") {
+            total_size += fs::file_size(e.path());
+            ++count;
+        }
+    }
+
+    if (count == 0) { std::cout << "Cache is empty.\n"; return; }
+
+    std::cout << "Cache: " << count << " file(s), "
+              << tui::format_size_bytes(total_size) << "\n\n";
+
+    if (!tui::quiet) {
+        printf("Remove all cached packages? [Y/n] ");
+        std::string ans; std::getline(std::cin, ans);
+        if (ans != "Y" && ans != "y" && !ans.empty()) { std::cout << "Aborted.\n"; return; }
+    }
+
+    for (const auto& e : fs::directory_iterator(cache))
+        if (e.path().extension() == ".wrp" || e.path().extension() == ".sha256")
+            fs::remove(e.path());
+
+    tui::log_step("Cache cleared...", "ok");
+    tui::done_ok();
+}
+
 void scan_system() {
     tui::log_step("Scanning system libraries via ldconfig...");
 

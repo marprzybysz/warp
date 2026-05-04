@@ -54,6 +54,8 @@ Repositories:
   repo --remove <n>  Remove a repository by number
 
 Diagnostics:
+  --autoremove       Remove packages no longer needed as dependencies
+  --clean-cache      Remove all cached package files
   --fix              Repair broken dependencies
   --check            Verify integrity of installed packages
   --orphans          List orphaned packages
@@ -114,9 +116,34 @@ static void cmd_list() {
 }
 
 static void cmd_info(const std::string& name) {
-    if (name.empty())       tui::done_err("Provide a package name");
-    if (!db::exists(name))  tui::done_err("Package '" + name + "' is not installed");
-    std::cout << db::get_info(name);
+    if (name.empty()) tui::done_err("Provide a package name");
+
+    if (db::exists(name)) {
+        std::cout << db::get_info(name);
+        auto [repo_ver, _] = repo::index_get_any(name, "version");
+        if (!repo_ver.empty() && repo_ver != db::get_version(name))
+            std::cout << "update=" << repo_ver << " (available)\n";
+        return;
+    }
+
+    // Not installed — try repo index
+    auto [version, re]    = repo::index_get_any(name, "version");
+    if (version.empty())  tui::done_err("Package '" + name + "' not found (not installed, not in index)");
+
+    auto [desc, _1]       = repo::index_get_any(name, "description");
+    auto [deps, _2]       = repo::index_get_any(name, "deps");
+    auto [license, _3]    = repo::index_get_any(name, "license");
+    auto [arch, _4]       = repo::index_get_any(name, "arch");
+    auto [size_kb, _5]    = repo::index_get_any(name, "size");
+
+    std::cout << "name="        << name    << "\n"
+              << "version="     << version << "\n"
+              << "arch="        << arch    << "\n"
+              << "deps="        << deps    << "\n"
+              << "license="     << license << "\n"
+              << "description=" << desc    << "\n"
+              << "size="        << size_kb << " kB\n"
+              << "status=not installed\n";
 }
 
 static void cmd_owner(const std::string& filepath) {
@@ -217,6 +244,8 @@ int main(int argc, char* argv[]) {
     else if (cmd == "-buildI")    { build::build_from_source(argc > 2 ? argv[2] : "", true);  tui::done_ok(); }
     else if (cmd == "--scan-system") { diag::scan_system(); tui::done_ok(); }
     else if (cmd == "--sync")     { repo::sync(); tui::println(""); tui::done_ok(); }
+    else if (cmd == "--autoremove")  { diag::autoremove(); }
+    else if (cmd == "--clean-cache") { diag::clean_cache(); }
     else if (cmd == "--fix")      { diag::fix(); }
     else if (cmd == "--check")    { diag::check(); }
     else if (cmd == "--orphans")  { diag::orphans(); }

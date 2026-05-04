@@ -16,5 +16,6 @@ void done_ok();
 void warn(const std::string& msg);
 void println(const std::string& msg);
 std::string format_size(const std::string& path);
+std::string format_size_bytes(uintmax_t bytes);
 
 } // namespace tui

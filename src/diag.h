@@ -12,5 +12,7 @@ void remove_cache(const std::string& name);
 void verify(const std::string& path);
 void push(const std::string& path);
 void scan_system();
+void autoremove();
+void clean_cache();
 
 } // namespace diag

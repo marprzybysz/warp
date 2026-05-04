@@ -85,6 +85,23 @@ void from_warp(const fs::path& file) {
     if (fs::is_directory(files_dir)) {
         auto src_files = collect_files(files_dir);
         int total = static_cast<int>(src_files.size());
+
+        // Conflict detection — check if any file is owned by another package
+        std::vector<std::string> conflicts;
+        for (const auto& src : src_files) {
+            fs::path dst = fs::path("/") / fs::relative(src, files_dir);
+            if (!fs::exists(dst)) continue;
+            std::string owner = db::owner_of(dst.string());
+            if (!owner.empty() && owner != name)
+                conflicts.push_back(dst.string() + " (owned by " + owner + ")");
+        }
+        if (!conflicts.empty()) {
+            fs::remove_all(tmpdir);
+            std::string msg = "File conflicts detected:\n";
+            for (const auto& c : conflicts) msg += "  " + c + "\n";
+            tui::done_err(msg);
+        }
+
         int count = 0;
         for (const auto& src : src_files) {
             fs::path rel = fs::relative(src, files_dir);
