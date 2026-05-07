@@ -15,6 +15,7 @@ add_executable(warp
     src/config.cpp
     src/db.cpp
     src/format.cpp
+    src/dep.cpp
     src/install.cpp
     src/remove.cpp
     src/build.cpp

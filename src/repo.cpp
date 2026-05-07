@@ -2,6 +2,7 @@
 #include "tui.h"
 #include "config.h"
 #include "db.h"
+#include "dep.h"
 #include "install.h"
 #include "remove.h"
 #include <iostream>
@@ -177,22 +178,22 @@ void sync() {
     }
 }
 
-void install(const std::string& pkg) {
-    if (pkg.empty()) tui::done_err("Provide a package name");
-
-    auto repos = load_repos();
+static void install_one(const std::string& pkg, const std::vector<RepoEntry>& repos) {
     auto [version, repo_entry] = index_get_all(repos, pkg, "version");
-    if (version.empty())
-        tui::done_err("Package '" + pkg + "' not found — run: warp --sync");
 
-    tui::log_step("Found: " + pkg + " " + version, "ok");
+    if (version.empty()) {
+        if (db::exists(pkg)) return; // system lib or locally installed — skip
+        tui::done_err("Package '" + pkg + "' not found in any index — run: warp --sync");
+    }
 
     if (db::exists(pkg) && db::get_version(pkg) == version) {
-        tui::log_step(pkg + " " + version + " already installed...", "ok");
+        tui::log_step(pkg + " " + version + " already installed", "ok");
         return;
     }
 
-    std::string file_rel    = index_get_file(index_for(repo_entry.n), pkg, "file");
+    tui::log_step("Selected: " + pkg + " " + version, "ok");
+
+    std::string file_rel     = index_get_file(index_for(repo_entry.n), pkg, "file");
     std::string expected_sha = index_get_file(index_for(repo_entry.n), pkg, "sha256");
 
     if (file_rel.empty())
@@ -204,10 +205,8 @@ void install(const std::string& pkg) {
         std::string url = repo_entry.url + "/" + file_rel;
         tui::log_step("Downloading " + pkg + " " + version + "...");
         fs::create_directories(pkg_cache());
-
         if (!curl_download(url, cached))
             tui::done_err("Download failed: " + url);
-
         tui::clear_progress();
         tui::log_step("Downloaded " + pkg + "...", "ok");
     } else {
@@ -223,7 +222,37 @@ void install(const std::string& pkg) {
         tui::log_step("SHA256 OK...", "ok");
     }
 
-    ::install::from_warp(cached);
+    // Deps already resolved by dep::resolve — skip in-package DEPS resolution.
+    ::install::from_warp(cached, false);
+}
+
+void install(const std::string& pkg) {
+    if (pkg.empty()) tui::done_err("Provide a package name");
+
+    std::vector<std::string> order;
+    try {
+        order = dep::resolve(pkg);
+    } catch (const std::exception& e) {
+        tui::done_err(e.what());
+    }
+
+    auto repos = load_repos();
+
+    // Print install plan when there are dependencies to install.
+    std::vector<std::string> to_install;
+    for (const auto& p : order) {
+        auto [ver, _] = index_get_all(repos, p, "version");
+        if (!ver.empty() && !(db::exists(p) && db::get_version(p) == ver))
+            to_install.push_back(p);
+    }
+    if (to_install.size() > 1) {
+        std::string plan = "Installing " + std::to_string(to_install.size()) + " packages:";
+        for (const auto& p : to_install) plan += " " + p;
+        tui::log_step(plan);
+    }
+
+    for (const auto& p : order)
+        install_one(p, repos);
 }
 
 void list_updates() {

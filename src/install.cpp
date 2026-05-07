@@ -29,7 +29,7 @@ static std::vector<std::string> collect_files(const fs::path& dir) {
     return files;
 }
 
-void from_warp(const fs::path& file) {
+void from_warp(const fs::path& file, bool resolve_deps) {
     std::string size = tui::format_size(file.string());
 
     fs::path tmpdir = format::extract_to_tmp(file);
@@ -48,20 +48,23 @@ void from_warp(const fs::path& file) {
 
     tui::progress_bar(10);
 
-    // Resolve and auto-install deps
-    fs::path deps_path = tmpdir / "DEPS";
-    if (fs::exists(deps_path)) {
-        std::ifstream df(deps_path);
-        std::string deps_line;
-        if (std::getline(df, deps_line) && !deps_line.empty()) {
-            std::istringstream ss(deps_line);
-            std::string dep;
-            while (std::getline(ss, dep, ',')) {
-                dep.erase(0, dep.find_first_not_of(' '));
-                dep.erase(dep.find_last_not_of(' ') + 1);
-                if (dep.empty() || db::exists(dep)) continue;
-                tui::log_step("Installing dependency: " + dep + "...");
-                repo::install(dep);
+    // Resolve and auto-install deps from the package's own DEPS file.
+    // Skipped when called from repo::install which already resolved the full tree.
+    if (resolve_deps) {
+        fs::path deps_path = tmpdir / "DEPS";
+        if (fs::exists(deps_path)) {
+            std::ifstream df(deps_path);
+            std::string deps_line;
+            if (std::getline(df, deps_line) && !deps_line.empty()) {
+                std::istringstream ss(deps_line);
+                std::string dep;
+                while (std::getline(ss, dep, ',')) {
+                    dep.erase(0, dep.find_first_not_of(' '));
+                    dep.erase(dep.find_last_not_of(' ') + 1);
+                    if (dep.empty() || db::exists(dep)) continue;
+                    tui::log_step("Installing dependency: " + dep + "...");
+                    repo::install(dep);
+                }
             }
         }
     }
@@ -103,14 +106,23 @@ void from_warp(const fs::path& file) {
         }
 
         int count = 0;
-        for (const auto& src : src_files) {
-            fs::path rel = fs::relative(src, files_dir);
-            fs::path dst = fs::path("/") / rel;
-            fs::create_directories(dst.parent_path());
-            fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
-            installed_files.push_back(dst.string());
-            ++count;
-            tui::progress_bar(50 + count * 40 / total);
+        try {
+            for (const auto& src : src_files) {
+                fs::path rel = fs::relative(src, files_dir);
+                fs::path dst = fs::path("/") / rel;
+                fs::create_directories(dst.parent_path());
+                fs::copy_file(src, dst, fs::copy_options::overwrite_existing);
+                installed_files.push_back(dst.string());
+                ++count;
+                tui::progress_bar(50 + count * 40 / total);
+            }
+        } catch (const std::exception& ex) {
+            for (const auto& f : installed_files) {
+                std::error_code ec;
+                fs::remove(f, ec);
+            }
+            fs::remove_all(tmpdir);
+            tui::done_err("Install failed, rolled back: " + std::string(ex.what()));
         }
     }
 
