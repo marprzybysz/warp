@@ -63,7 +63,7 @@ Diagnostics:
   --rollback <pkg>   Revert package to previous version
 
 System:
-  --version          Show version and license
+  --version, -v      Show version and license
   -info              WARP version and system info
   -help              Show this help
   -q                 Quiet mode (can appear anywhere)
@@ -260,7 +260,7 @@ int main(int argc, char* argv[]) {
         else if (sub == "--remove")         { repo::remove_repo(argc > 3 ? std::stoi(argv[3]) : 0); }
         else if (sub == "--gen-index")      { repo::gen_index(argc > 3 ? argv[3] : "."); tui::println(""); tui::done_ok(); }
         else { std::cerr << "Usage: warp repo --list | --add <url> | --remove <n> | --gen-index <dir>\n"; return 1; }
-    } else if (cmd == "--version")  { cmd_version(); }
+    } else if (cmd == "--version" || cmd == "-v")  { cmd_version(); }
     else if (cmd == "-info")      { cmd_sysinfo(); }
     else if (cmd == "-help" || cmd == "--help" || cmd == "-h") { usage(); }
     else if (cmd == "-q")         { usage(); }
