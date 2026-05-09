@@ -250,6 +250,7 @@ int main(int argc, char* argv[]) {
         diag::remove_cache(name);
         tui::done_ok();
     } else if (cmd == "-A")       { cmd_list(); }
+    else if (cmd == "-Q")         { std::cout << db::list_all().size() << "\n"; }
     else if (cmd == "-s")         { cmd_info(argc > 2 ? argv[2] : ""); }
     else if (cmd == "-S")         { cmd_owner(argc > 2 ? argv[2] : ""); }
     else if (cmd == "-ls")        { repo::search(argc > 2 ? argv[2] : ""); }

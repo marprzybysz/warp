@@ -1,0 +1,22 @@
+// Fastfetch — integracja z WARP
+// Wklej ten fragment do swojego ~/.config/fastfetch/config.jsonc
+// w sekcji "modules", tam gdzie chcesz żeby pokazywały się paczki.
+//
+// Przykład pełnego config.jsonc:
+// {
+//   "$schema": "...",
+//   "modules": [
+//     "Title", "Separator", "OS", "Host", "Kernel",
+//     { wklej ten obiekt tutaj },
+//     "Shell", "Terminal", ...
+//   ]
+// }
+
+{
+    "type": "Packages",
+    "key": "Packages",
+    "format": "{} (warp)",
+    "packages": {
+        "warp": "warp -Q 2>/dev/null"
+    }
+}
