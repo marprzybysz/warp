@@ -63,6 +63,10 @@ Diagnostics:
   --orphans          List orphaned packages
   --log              Show operation history
   --rollback <pkg>   Revert package to previous version
+  --scan-system      Register system libraries (ldconfig + pkg-config)
+
+Query (scripting):
+  -Q                 Print installed package count (for scripts/fetch tools)
 
 System:
   --version, -v      Show version and license
