@@ -9,11 +9,13 @@
 #include "diag.h"
 #include <iostream>
 #include <iomanip>
+#include <sstream>
 #include <clocale>
 #include <filesystem>
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <unistd.h>
 
 namespace fs = std::filesystem;
 
@@ -109,10 +111,24 @@ static void cmd_remove(const std::string& name, bool with_deps) {
 static void cmd_list() {
     auto pkgs = db::list_all();
     if (pkgs.empty()) { std::cout << "No packages installed.\n"; return; }
-    std::cout << std::left << std::setw(30) << "PACKAGE" << "VERSION\n";
-    std::cout << std::string(30, '-') << "-------\n";
+
+    std::ostringstream out;
+    out << std::left << std::setw(30) << "PACKAGE" << "VERSION\n";
+    out << std::string(30, '-') << "-------\n";
     for (const auto& p : pkgs)
-        std::cout << std::left << std::setw(30) << p.name << p.version << "\n";
+        out << std::left << std::setw(30) << p.name << p.version << "\n";
+
+    std::string content = out.str();
+
+    if (isatty(STDOUT_FILENO) && pkgs.size() > 20) {
+        FILE* pager = popen("less -R", "w");
+        if (pager) {
+            fwrite(content.c_str(), 1, content.size(), pager);
+            pclose(pager);
+            return;
+        }
+    }
+    std::cout << content;
 }
 
 static void cmd_info(const std::string& name) {

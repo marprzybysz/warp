@@ -10,6 +10,7 @@
 #include <sstream>
 #include <iomanip>
 #include <array>
+#include <map>
 #include <cstdio>
 
 namespace diag {
@@ -326,8 +327,36 @@ void clean_cache() {
     tui::done_ok();
 }
 
+static std::map<std::string, std::string> load_pc_versions() {
+    std::map<std::string, std::string> result;
+    auto trim = [](std::string& s) {
+        s.erase(0, s.find_first_not_of(" \t"));
+        s.erase(s.find_last_not_of(" \t\r\n") + 1);
+    };
+    for (const char* dir : {"/usr/lib/pkgconfig", "/usr/share/pkgconfig",
+                             "/usr/lib64/pkgconfig", "/usr/local/lib/pkgconfig"}) {
+        if (!fs::is_directory(dir)) continue;
+        for (const auto& entry : fs::directory_iterator(dir)) {
+            if (entry.path().extension() != ".pc") continue;
+            std::string name, version;
+            std::ifstream f(entry.path());
+            std::string line;
+            while (std::getline(f, line)) {
+                if (line.rfind("Name:", 0) == 0)      name    = line.substr(5);
+                else if (line.rfind("Version:", 0) == 0) version = line.substr(8);
+            }
+            trim(name); trim(version);
+            if (!name.empty() && !version.empty())
+                result[name] = version;
+        }
+    }
+    return result;
+}
+
 void scan_system() {
-    tui::log_step("Scanning system libraries via ldconfig...");
+    tui::log_step("Scanning system libraries via ldconfig and pkg-config...");
+
+    auto pc = load_pc_versions();
 
     FILE* p = popen("ldconfig -p 2>/dev/null", "r");
     if (!p) tui::done_err("ldconfig not found — cannot scan system libraries");
@@ -355,10 +384,15 @@ void scan_system() {
         if (dot != std::string::npos) name = name.substr(0, dot);
         if (name.empty()) continue;
 
-        // Derive version from .so.X
-        std::string ver = "system";
-        auto so_pos = soname.find(".so.");
-        if (so_pos != std::string::npos) ver = soname.substr(so_pos + 4);
+        // Full version: prefer pkg-config .pc, fall back to SONAME number
+        std::string ver;
+        auto pc_it = pc.find(name);
+        if (pc_it != pc.end()) {
+            ver = pc_it->second;
+        } else {
+            auto so_pos = soname.find(".so.");
+            ver = (so_pos != std::string::npos) ? soname.substr(so_pos + 4) : "system";
+        }
 
         if (db::exists(name)) continue; // don't overwrite user-installed packages
 
@@ -374,11 +408,24 @@ void scan_system() {
     }
     pclose(p);
 
+    // Register .pc packages that weren't caught by ldconfig (e.g. bash, coreutils-like tools)
+    for (const auto& [name, ver] : pc) {
+        if (db::exists(name)) continue;
+        fs::path pkg_dir = db::db_root / name;
+        fs::create_directories(pkg_dir);
+        { std::ofstream wi(pkg_dir / "WARPINFO");
+          wi << "name="    << name << "\n"
+             << "version=" << ver  << "\n"
+             << "source=system\n"; }
+        { std::ofstream src(pkg_dir / "SOURCE"); src << "system\n"; }
+        ++count;
+    }
+
     // Mark as initialized
     fs::path marker = db::db_root.parent_path() / ".initialized";
     { std::ofstream m(marker); m << "1\n"; }
 
-    tui::log_step("Registered " + std::to_string(count) + " system libraries...", "ok");
+    tui::log_step("Registered " + std::to_string(count) + " system libraries/packages...", "ok");
 }
 
 } // namespace diag
