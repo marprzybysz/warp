@@ -37,17 +37,45 @@ static int term_height() {
     return 24;
 }
 
-static std::string draw_bar(int pct) {
+static std::string _progress_label;
+
+static std::string draw_bar(int pct, const std::string& label) {
     int tw = term_width();
-    std::string prefix = "Progress:" + std::to_string(pct) + "% ";
-    int bar_width = tw - static_cast<int>(prefix.size()) - 3;
-    if (bar_width < 10) bar_width = 10;
+
+    // label padded to 20 chars, pct suffix " 100%"
+    std::string lbl = label.empty() ? "Working" : label;
+    if (static_cast<int>(lbl.size()) > 20) lbl = lbl.substr(0, 20);
+    while (static_cast<int>(lbl.size()) < 20) lbl += ' ';
+
+    std::string pct_str = " " + std::to_string(pct) + "%";
+    // [label] [bar] pct_str
+    int bar_width = tw - 20 - 4 - static_cast<int>(pct_str.size());
+    if (bar_width < 8) bar_width = 8;
+
     int filled = pct * bar_width / 100;
     if (filled < 0) filled = 0;
     if (filled > bar_width) filled = bar_width;
-    std::string bar(filled, '#');
-    std::string empty(bar_width - filled, ' ');
-    return prefix + "[" + bar + empty + "]";
+
+    std::string filled_str, empty_str;
+    for (int i = 0; i < filled; ++i)            filled_str += "\xe2\x96\x88"; // █
+    for (int i = filled; i < bar_width; ++i)    empty_str  += "\xe2\x96\x91"; // ░
+
+    // label cyan, fill green, rest default
+    std::string out;
+    if (use_color) {
+        out += "\033[0;36m";   // cyan
+        out += lbl;
+        out += "\033[0m [";
+        out += "\033[0;32m";   // green
+        out += filled_str;
+        out += "\033[0m";
+        out += empty_str;
+        out += "]";
+        out += pct_str;
+    } else {
+        out += lbl + " [" + filled_str + empty_str + "]" + pct_str;
+    }
+    return out;
 }
 
 static void erase_bar() {
@@ -60,16 +88,17 @@ static void redraw_bar() {
     if (_progress_pct < 0) return;
     int th = term_height();
     std::cout << "\033[s\033[" << th << ";1H\033[2K"
-              << draw_bar(_progress_pct) << "\033[u" << std::flush;
+              << draw_bar(_progress_pct, _progress_label) << "\033[u" << std::flush;
 }
 
-void progress_bar(int percent, const std::string& /*action*/) {
+void progress_bar(int percent, const std::string& action) {
     if (percent < 0)   percent = 0;
     if (percent > 100) percent = 100;
-    _progress_pct = percent;
+    _progress_pct   = percent;
+    if (!action.empty()) _progress_label = action;
     int th = term_height();
     std::cout << "\033[s\033[" << th << ";1H\033[2K"
-              << draw_bar(percent) << "\033[u" << std::flush;
+              << draw_bar(percent, _progress_label) << "\033[u" << std::flush;
 }
 
 void clear_progress() {

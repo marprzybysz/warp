@@ -46,7 +46,7 @@ void from_warp(const fs::path& file, bool resolve_deps) {
     if (!tui::quiet)
         std::cout << "Selecting " << name << " " << version << " [" << size << "]\n";
 
-    tui::progress_bar(10);
+    tui::progress_bar(10, "Resolving  " + name);
 
     // Resolve and auto-install deps from the package's own DEPS file.
     // Skipped when called from repo::install which already resolved the full tree.
@@ -68,19 +68,19 @@ void from_warp(const fs::path& file, bool resolve_deps) {
             }
         }
     }
-    tui::progress_bar(35);
+    tui::progress_bar(35, "Extracting " + name);
 
     // Run INSTALL script if present
     fs::path install_script = tmpdir / "INSTALL";
     if (fs::exists(install_script)) {
-        tui::progress_bar(45);
+        tui::progress_bar(45, "Configuring" + name);
         fs::permissions(install_script, fs::perms::owner_exec, fs::perm_options::add);
         if (std::system(install_script.c_str()) != 0) {
             fs::remove_all(tmpdir);
             tui::done_err("INSTALL script failed");
         }
     }
-    tui::progress_bar(50);
+    tui::progress_bar(50, "Installing " + name);
 
     // Copy files
     fs::path files_dir = tmpdir / "files";
@@ -126,9 +126,9 @@ void from_warp(const fs::path& file, bool resolve_deps) {
         }
     }
 
-    tui::progress_bar(95);
+    tui::progress_bar(95, "Registering" + name);
     db::save(name, version, "warp", installed_files);
-    tui::progress_bar(100);
+    tui::progress_bar(100, "Done       " + name);
     db::log("install", name, version);
     fs::remove_all(tmpdir);
     tui::done_ok();
