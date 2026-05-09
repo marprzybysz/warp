@@ -119,34 +119,31 @@ static void cmd_list() {
 
     auto colorize = [&](const db::PkgEntry& p) -> std::string {
         if (!color) return "";
-        if (p.source == "system")                        return "\033[2m";     // dim — system
-        if (p.name.rfind("lib", 0) == 0)                return "\033[0;33m";  // yellow — library
-        return "\033[0;32m";                                                    // green — app
+        if (p.source == "system")       return "\033[2m";    // dim — system
+        if (p.name.rfind("lib", 0) == 0) return "\033[0;33m"; // yellow — library
+        return "\033[0;32m";                                   // green — app
     };
     const std::string reset = color ? "\033[0m" : "";
 
-    std::ostringstream out;
-    out << std::left << std::setw(30) << "PACKAGE" << "VERSION\n";
-    out << std::string(30, '-') << "-------\n";
-    for (const auto& p : pkgs) {
-        std::string col = colorize(p);
-        out << col
-            << std::left << std::setw(30) << p.name
-            << p.version
-            << reset << "\n";
+    // Write to a temp file, then open with less -R (preserves colors)
+    fs::path tmp = fs::temp_directory_path() / "warp-list.tmp";
+    {
+        std::ofstream f(tmp);
+        f << std::left << std::setw(30) << "PACKAGE" << "VERSION\n";
+        f << std::string(30, '-') << "-------\n";
+        for (const auto& p : pkgs)
+            f << colorize(p)
+              << std::left << std::setw(30) << p.name
+              << p.version << reset << "\n";
     }
-
-    std::string content = out.str();
 
     if (isatty(STDOUT_FILENO) && pkgs.size() > 20) {
-        FILE* pager = popen("less -R", "w");
-        if (pager) {
-            fwrite(content.c_str(), 1, content.size(), pager);
-            pclose(pager);
-            return;
-        }
+        std::system(("less -R " + tmp.string()).c_str());
+    } else {
+        std::ifstream f(tmp);
+        std::cout << f.rdbuf();
     }
-    std::cout << content;
+    fs::remove(tmp);
 }
 
 static void cmd_info(const std::string& name) {
