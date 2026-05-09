@@ -63,7 +63,6 @@ Diagnostics:
   --orphans          List orphaned packages
   --log              Show operation history
   --rollback <pkg>   Revert package to previous version
-  --scan-system      Register system libraries (ldconfig + pkg-config)
 
 Query (scripting):
   -Q                 Print installed package count (for scripts/fetch tools)
@@ -278,8 +277,7 @@ int main(int argc, char* argv[]) {
     else if (cmd == "-cP")        { build::create_pkg(argc > 2 ? argv[2] : ""); tui::done_ok(); }
     else if (cmd == "-build")     { build::build_from_source(argc > 2 ? argv[2] : "", false); tui::done_ok(); }
     else if (cmd == "-buildI")    { build::build_from_source(argc > 2 ? argv[2] : "", true);  tui::done_ok(); }
-    else if (cmd == "--scan-system") { diag::scan_system(); tui::done_ok(); }
-    else if (cmd == "--sync")     { repo::sync(); tui::println(""); tui::done_ok(); }
+    else if (cmd == "--sync")     { repo::sync(); diag::scan_system(); tui::println(""); tui::done_ok(); }
     else if (cmd == "--autoremove")  { diag::autoremove(); }
     else if (cmd == "--clean-cache") { diag::clean_cache(); }
     else if (cmd == "--fix")      { diag::fix(); }
