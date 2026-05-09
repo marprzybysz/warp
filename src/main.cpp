@@ -125,25 +125,12 @@ static void cmd_list() {
     };
     const std::string reset = color ? "\033[0m" : "";
 
-    // Write to a temp file, then open with less -R (preserves colors)
-    fs::path tmp = fs::temp_directory_path() / "warp-list.tmp";
-    {
-        std::ofstream f(tmp);
-        f << std::left << std::setw(30) << "PACKAGE" << "VERSION\n";
-        f << std::string(30, '-') << "-------\n";
-        for (const auto& p : pkgs)
-            f << colorize(p)
-              << std::left << std::setw(30) << p.name
-              << p.version << reset << "\n";
-    }
-
-    if (isatty(STDOUT_FILENO) && pkgs.size() > 20) {
-        std::system(("less -R " + tmp.string()).c_str());
-    } else {
-        std::ifstream f(tmp);
-        std::cout << f.rdbuf();
-    }
-    fs::remove(tmp);
+    std::cout << std::left << std::setw(30) << "PACKAGE" << "VERSION\n";
+    std::cout << std::string(30, '-') << "-------\n";
+    for (const auto& p : pkgs)
+        std::cout << colorize(p)
+                  << std::left << std::setw(30) << p.name
+                  << p.version << reset << "\n";
 }
 
 static void cmd_info(const std::string& name) {
