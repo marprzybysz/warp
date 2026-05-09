@@ -16,6 +16,8 @@
 #include <string>
 #include <algorithm>
 #include <unistd.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
 namespace fs = std::filesystem;
 
@@ -111,26 +113,80 @@ static void cmd_remove(const std::string& name, bool with_deps) {
     remove_pkg::remove(name, with_deps);
 }
 
+static int get_term_rows() {
+    struct winsize w{};
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0 && w.ws_row > 0)
+        return w.ws_row;
+    return 24;
+}
+
 static void cmd_list() {
     auto pkgs = db::list_all();
     if (pkgs.empty()) { std::cout << "No packages installed.\n"; return; }
 
-    bool color = tui::use_color && isatty(STDOUT_FILENO);
+    bool is_tty = isatty(STDOUT_FILENO);
+    bool color  = tui::use_color && is_tty;
 
     auto colorize = [&](const db::PkgEntry& p) -> std::string {
         if (!color) return "";
-        if (p.source == "system")       return "\033[2m";    // dim — system
-        if (p.name.rfind("lib", 0) == 0) return "\033[0;33m"; // yellow — library
-        return "\033[0;32m";                                   // green — app
+        if (p.source == "system")        return "\033[2m";
+        if (p.name.rfind("lib", 0) == 0) return "\033[0;33m";
+        return "\033[0;32m";
     };
     const std::string reset = color ? "\033[0m" : "";
 
-    std::cout << std::left << std::setw(30) << "PACKAGE" << "VERSION\n";
-    std::cout << std::string(30, '-') << "-------\n";
-    for (const auto& p : pkgs)
-        std::cout << colorize(p)
-                  << std::left << std::setw(30) << p.name
-                  << p.version << reset << "\n";
+    // Build all lines
+    std::vector<std::string> lines;
+    {
+        std::ostringstream h;
+        h << std::left << std::setw(30) << "PACKAGE" << "VERSION";
+        lines.push_back(h.str());
+    }
+    lines.push_back(std::string(30, '-') + "-------");
+    for (const auto& p : pkgs) {
+        std::ostringstream row;
+        row << colorize(p)
+            << std::left << std::setw(30) << p.name
+            << p.version << reset;
+        lines.push_back(row.str());
+    }
+
+    // No pager when piped or few lines
+    int rows = get_term_rows();
+    if (!is_tty || static_cast<int>(lines.size()) <= rows - 2) {
+        for (const auto& l : lines) std::cout << l << "\n";
+        return;
+    }
+
+    // Built-in pager: one screen at a time, safe terminal restore
+    struct termios orig{}, raw{};
+    tcgetattr(STDIN_FILENO, &orig);
+    raw = orig;
+    raw.c_lflag &= ~(ICANON | ECHO);
+    raw.c_cc[VMIN]  = 1;
+    raw.c_cc[VTIME] = 0;
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+
+    int page = rows - 2;
+    int printed = 0;
+    bool quit = false;
+    for (const auto& l : lines) {
+        if (quit) break;
+        std::cout << l << "\n";
+        ++printed;
+        if (printed >= page && &l != &lines.back()) {
+            std::cout << "\033[7m -- ENTER: next, q: quit -- \033[0m" << std::flush;
+            char ch;
+            while (read(STDIN_FILENO, &ch, 1) == 1) {
+                if (ch == 'q' || ch == 'Q') { quit = true; break; }
+                if (ch == '\n' || ch == '\r' || ch == ' ') break;
+            }
+            std::cout << "\r\033[2K" << std::flush;
+            printed = 0;
+        }
+    }
+
+    tcsetattr(STDIN_FILENO, TCSANOW, &orig);
 }
 
 static void cmd_info(const std::string& name) {
