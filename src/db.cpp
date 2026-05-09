@@ -98,9 +98,12 @@ std::vector<PkgEntry> list_all() {
     for (const auto& entry : fs::directory_iterator(db_root)) {
         if (!entry.is_directory()) continue;
         PkgEntry pkg;
-        pkg.name = entry.path().filename().string();
+        pkg.name    = entry.path().filename().string();
         pkg.version = get_version(pkg.name);
         if (pkg.version.empty()) pkg.version = "unknown";
+        { std::ifstream sf(entry.path() / "SOURCE");
+          std::getline(sf, pkg.source); }
+        if (pkg.source.empty()) pkg.source = "warp";
         result.push_back(std::move(pkg));
     }
     return result;

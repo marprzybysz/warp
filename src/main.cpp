@@ -112,11 +112,26 @@ static void cmd_list() {
     auto pkgs = db::list_all();
     if (pkgs.empty()) { std::cout << "No packages installed.\n"; return; }
 
+    bool color = tui::use_color && isatty(STDOUT_FILENO);
+
+    auto colorize = [&](const db::PkgEntry& p) -> std::string {
+        if (!color) return "";
+        if (p.source == "system")                        return "\033[2m";     // dim — system
+        if (p.name.rfind("lib", 0) == 0)                return "\033[0;33m";  // yellow — library
+        return "\033[0;32m";                                                    // green — app
+    };
+    const std::string reset = color ? "\033[0m" : "";
+
     std::ostringstream out;
     out << std::left << std::setw(30) << "PACKAGE" << "VERSION\n";
     out << std::string(30, '-') << "-------\n";
-    for (const auto& p : pkgs)
-        out << std::left << std::setw(30) << p.name << p.version << "\n";
+    for (const auto& p : pkgs) {
+        std::string col = colorize(p);
+        out << col
+            << std::left << std::setw(30) << p.name
+            << p.version
+            << reset << "\n";
+    }
 
     std::string content = out.str();
 

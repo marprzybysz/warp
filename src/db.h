@@ -23,6 +23,7 @@ void remove(const std::string& name);
 struct PkgEntry {
     std::string name;
     std::string version;
+    std::string source; // "warp", "tarxz", "system"
 };
 std::vector<PkgEntry> list_all();
 std::vector<std::string> list_names();
