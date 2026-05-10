@@ -1,3 +1,4 @@
 build/
 *.wrp
 *.sha256
+warppkgs/
