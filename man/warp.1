@@ -1,4 +1,4 @@
-.TH WARP 1 "2026" "WARP 0.1.0" "Warp Archive Repository Packager"
+.TH WARP 1 "May 2026" "WARP 0.4.4" "Warp Archive Repository Packager"
 .SH NAME
 warp \- Warp Archive Repository Packager for Flow Linux
 .SH SYNOPSIS
@@ -40,7 +40,8 @@ Remove package, its dependencies, and cached files.
 .SH UPDATES
 .TP
 .B \-\-sync
-Synchronize the repository index from the configured repo URL.
+Synchronize the repository index, scan system libraries via ldconfig and
+pkg-config, and list available updates.
 .TP
 .B \-U
 Upgrade all installed packages to the latest available versions.
@@ -50,10 +51,16 @@ List packages that have updates available.
 .SH QUERY
 .TP
 .B \-A
-List all installed packages with their versions.
+List all installed packages with their versions. Uses colored output and a
+built-in pager when running in a terminal. Green = applications, yellow =
+libraries, dim = system packages. Colors and pager are disabled when piped.
+.TP
+.B \-Q
+Print the number of installed packages (for use in scripts, fastfetch, etc.).
 .TP
 .BR \-s " \fIpkg\fR"
-Show detailed information about an installed package.
+Show detailed information about a package. Works for both installed packages
+and packages available in the repository index.
 .TP
 .BR \-S " \fIfile\fR"
 Show which package owns the given file.
@@ -89,7 +96,28 @@ sidecar.
 Upload a
 .B .wrp
 package to the configured repository server.
+.SH REPOSITORIES
+.TP
+.B repo \-\-list
+List all configured repositories.
+.TP
+.BR "repo \-\-add" " \fIurl\fR"
+Add a repository URL.
+.TP
+.BR "repo \-\-remove" " \fIn\fR"
+Remove a repository by number.
+.TP
+.BR "repo \-\-gen\-index" " \fIdir\fR"
+Generate an INDEX file from a directory of
+.B .wrp
+files.
 .SH DIAGNOSTICS
+.TP
+.B \-\-autoremove
+Remove packages that were installed as dependencies and are no longer needed.
+.TP
+.B \-\-clean\-cache
+Remove all cached package files from the download cache.
 .TP
 .B \-\-check
 Verify that all files of every installed package are present on disk.
@@ -107,7 +135,7 @@ Show the history of install, remove, and upgrade operations.
 Revert a package to its previously cached version.
 .SH SYSTEM
 .TP
-.B \-\-version
+.BR \-\-version ", " \-v
 Print WARP version, copyright, and license information.
 .TP
 .B \-info
@@ -128,11 +156,11 @@ archive with the following structure:
 .PP
 .nf
 package.wrp
-├── WARPINFO     # name, version, arch, deps, license, description
-├── DEPS         # comma-separated dependency list
-├── INSTALL      # optional pre/post-install script
-├── REMOVE       # optional pre/post-remove script
-└── files/       # files to install, rooted at /
+\(ba\(em WARPINFO     # name, version, arch, deps, license, description
+\(ba\(em DEPS         # comma-separated dependency list
+\(ba\(em INSTALL      # optional pre/post-install script
+\(ba\(em REMOVE       # optional pre/post-remove script
+\(ga\(em files/       # files to install, rooted at /
 .fi
 .SH WARPBUILD
 A
@@ -157,16 +185,23 @@ package() {
     make install DESTDIR="$DESTDIR"
 }
 .fi
+.PP
+Environment variables available in build() and package():
+.BR DESTDIR " \(em staging directory"
+.br
+.BR PREFIX " \(em /usr"
+.br
+.BR MAKEFLAGS " \(em -j<nproc>"
 .SH FILES
 .TP
 .I /etc/warp/warp.conf
 System-wide configuration file.
 .TP
-.I /var/lib/warp/db/
+.I /var/cache/warp/db/
 Package database. Each installed package has a subdirectory containing
-.BR WARPINFO ", " FILES ", and " SOURCE .
+.BR WARPINFO ", " FILES ", " DEPS ", and " SOURCE .
 .TP
-.I /var/lib/warp/warp.log
+.I /var/cache/warp/warp.log
 Operation log (install, remove, upgrade, rollback).
 .TP
 .I /var/cache/warp/index/INDEX
@@ -179,31 +214,37 @@ Cached downloaded
 files.
 .SH EXAMPLES
 .TP
-Install firefox from repository:
+Sync repositories and scan system:
+.B warp --sync
+.TP
+Install from repository:
 .B warp -G firefox
 .TP
 Install multiple packages:
-.B warp -G firefox btop tmux neofetch
+.B warp -G firefox btop tmux
 .TP
 Install a local package:
 .B warp -i firefox-92.0-x86_64.wrp
 .TP
-Remove a package:
-.B warp -D firefox
+Remove a package and its deps:
+.B warp -DD firefox
 .TP
-Build a package from source:
-.B warp -build ./my-package/
+Build from source and install:
+.B warp -buildI ./tmux/
 .TP
 Search for a package:
 .B warp -ls browser
 .TP
 Check system integrity:
 .B warp --check
+.TP
+Package count for scripts:
+.B warp -Q
 .SH SEE ALSO
 .BR tar (1),
 .BR sha256sum (1),
-.BR ldd (1)
+.BR ldd (1),
+.BR ldconfig (8),
+.BR pkg-config (1)
 .SH AUTHORS
 Marcin Przybysz <marprzybysz888@gmail.com>
-.PP
-Contributions by Claude Sonnet (Anthropic).

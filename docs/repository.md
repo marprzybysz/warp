@@ -51,9 +51,31 @@ sha256=b9e2d1f3a4c5e6b7d8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1
 size=8493012
 ```
 
+### Generating INDEX
+
+Use `warp repo --gen-index` to automatically generate an INDEX from a directory of `.wrp` files:
+
+```bash
+warp repo --gen-index /srv/repo/packages/
+```
+
+This scans all `.wrp` files, extracts their WARPINFO, and writes a complete INDEX file.
+
 ---
 
-## Setting Up a Local Repository (for testing)
+## Setting Up a Repository
+
+### GitHub (recommended for small repos)
+
+1. Create a GitHub repository (e.g. `warppkgs`)
+2. Add `.wrp` files and an INDEX
+3. Use raw GitHub URLs as the repo source
+
+```bash
+warp repo --add https://raw.githubusercontent.com/user/warppkgs/main
+```
+
+### Local HTTP Server (for testing)
 
 ```bash
 # Create repo structure
@@ -70,16 +92,8 @@ EOF
 # Move packages in
 cp firefox-92.0-x86_64.wrp ~/flow-repo/packages/
 
-# Generate INDEX (manual for now — warp --push will automate this)
-cat > ~/flow-repo/INDEX <<EOF
-[firefox]
-version=92.0
-arch=x86_64
-deps=glibc,gtk3,dbus
-file=packages/firefox-92.0-x86_64.wrp
-sha256=$(sha256sum ~/flow-repo/packages/firefox-92.0-x86_64.wrp | cut -d' ' -f1)
-size=$(stat -c%s ~/flow-repo/packages/firefox-92.0-x86_64.wrp)
-EOF
+# Generate INDEX
+warp repo --gen-index ~/flow-repo/
 
 # Serve it
 cd ~/flow-repo && python3 -m http.server 8080
@@ -87,13 +101,8 @@ cd ~/flow-repo && python3 -m http.server 8080
 
 Then configure WARP to use it:
 
-```ini
-# /etc/warp/warp.conf
-[network]
-repo=http://localhost:8080
-```
-
 ```bash
+warp repo --add http://localhost:8080
 warp --sync
 warp -G firefox
 ```
@@ -102,26 +111,15 @@ warp -G firefox
 
 ## Multiple Repositories
 
-WARP supports multiple repos. Each is listed in `/etc/warp/repos.d/`:
+WARP supports multiple repos. Manage them with:
 
-```
-/etc/warp/repos.d/
-├── core.conf
-├── extra.conf
-└── local.conf
-```
-
-Each file:
-
-```ini
-[repo]
-name=flow-core
-url=https://repo.flow.org/core
-enabled=true
-priority=10
+```bash
+warp repo --list              # show all repos
+warp repo --add <url>         # add a repo
+warp repo --remove <number>   # remove by number
 ```
 
-Lower priority number = higher priority. If the same package exists in two repos, the one with lower priority wins.
+Repositories are tried in order. If the same package exists in two repos, the first repo wins.
 
 ---
 
@@ -134,8 +132,8 @@ warp -cP mypkg-1.0.0/
 # Verify
 warp --verify mypkg-1.0.0-x86_64.wrp
 
-# Push to repo (updates INDEX and uploads file)
+# Push to repo
 warp --push mypkg-1.0.0-x86_64.wrp
 ```
 
-`warp --push` requires write access to the repo server. The exact method (SSH, HTTP PUT, rsync) is configured in `/etc/warp/warp.conf`.
+`warp --push` uploads the package to the configured repository server.
