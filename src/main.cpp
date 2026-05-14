@@ -15,9 +15,11 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <functional>
 #include <unistd.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <sys/utsname.h>
 
 namespace fs = std::filesystem;
 
