@@ -2,6 +2,7 @@
 #include "repo.h"
 #include "tui.h"
 #include "db.h"
+#include "diag.h"
 #include "format.h"
 #include <fstream>
 #include <sstream>
@@ -47,6 +48,10 @@ void from_warp(const fs::path& file, bool resolve_deps) {
         std::cout << "Selecting " << name << " " << version << " [" << size << "]\n";
 
     tui::progress_bar(10, "Resolving  " + name);
+
+    // Auto-scan system libs so deps like glibc are always visible in DB.
+    if (resolve_deps)
+        diag::scan_system_quiet();
 
     // Resolve and auto-install deps from the package's own DEPS file.
     // Skipped when called from repo::install which already resolved the full tree.

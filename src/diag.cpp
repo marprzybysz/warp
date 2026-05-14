@@ -428,4 +428,11 @@ void scan_system() {
     tui::log_step("Registered " + std::to_string(count) + " system libraries/packages...", "ok");
 }
 
+void scan_system_quiet() {
+    bool prev = tui::quiet;
+    tui::quiet = true;
+    scan_system();
+    tui::quiet = prev;
+}
+
 } // namespace diag
