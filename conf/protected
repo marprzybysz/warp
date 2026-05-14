@@ -1,0 +1,11 @@
+# WARP — lista chronionych pakietów
+# Tych pakietów warp nigdy nie usunie ani nie zaktualizuje.
+# Edytuj ręcznie lub użyj: warp protect <pkg> / warp unprotect <pkg>
+
+# Toolchain — nigdy nie ruszać przez warp
+glibc
+gcc-runtime
+binutils
+linux
+libxcrypt
+bash

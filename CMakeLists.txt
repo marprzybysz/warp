@@ -21,6 +21,7 @@ add_executable(warp
     src/build.cpp
     src/repo.cpp
     src/diag.cpp
+    src/protect.cpp
 )
 
 target_link_libraries(warp PRIVATE ${LIBARCHIVE_LIBRARIES} ${LIBCURL_LIBRARIES})
@@ -30,4 +31,5 @@ target_compile_options(warp PRIVATE -Wall -Wextra -Wpedantic)
 
 install(TARGETS warp RUNTIME DESTINATION bin)
 install(FILES conf/warp.conf DESTINATION /etc/warp)
+install(FILES conf/protected DESTINATION /etc/warp)
 install(FILES man/warp.1 DESTINATION share/man/man1)

@@ -7,6 +7,7 @@
 #include "build.h"
 #include "repo.h"
 #include "diag.h"
+#include "protect.h"
 #include <iostream>
 #include <iomanip>
 #include <sstream>
@@ -23,7 +24,7 @@
 
 namespace fs = std::filesystem;
 
-static const std::string WARP_VERSION = "0.5.5";
+static const std::string WARP_VERSION = "0.5.6";
 
 static void usage() {
     std::cout << R"(Usage: warp [options] [package/file]
@@ -70,6 +71,11 @@ Diagnostics:
 
 Query (scripting):
   -Q                 Print installed package count (for scripts/fetch tools)
+
+Protection:
+  protect <pkg>      Add package to protected list (never remove/upgrade)
+  unprotect <pkg>    Remove package from protected list
+  protected          List all protected packages
 
 System:
   --version, -v      Show version and license
@@ -421,7 +427,10 @@ int main(int argc, char* argv[]) {
         else if (sub == "--remove")         { repo::remove_repo(argc > 3 ? std::stoi(argv[3]) : 0); }
         else if (sub == "--gen-index")      { repo::gen_index(argc > 3 ? argv[3] : "."); tui::println(""); tui::done_ok(); }
         else { std::cerr << "Usage: warp repo --list | --add <url> | --remove <n> | --gen-index <dir>\n"; return 1; }
-    } else if (cmd == "--version" || cmd == "-v")  { cmd_version(); }
+    } else if (cmd == "protect")   { protect::add(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "unprotect")   { protect::remove(argc > 2 ? argv[2] : ""); }
+    else if (cmd == "protected")   { protect::list(); }
+    else if (cmd == "--version" || cmd == "-v")  { cmd_version(); }
     else if (cmd == "-info")      { cmd_sysinfo(); }
     else if (cmd == "-help" || cmd == "--help" || cmd == "-h") { usage(); }
     else if (cmd == "-q")         { usage(); }

@@ -1,4 +1,5 @@
 #include "remove.h"
+#include "protect.h"
 #include "tui.h"
 #include "db.h"
 #include <filesystem>
@@ -10,6 +11,9 @@ namespace fs = std::filesystem;
 void remove(const std::string& name, bool /*with_deps*/) {
     if (!db::exists(name))
         tui::done_err("Package '" + name + "' is not installed");
+
+    if (protect::is_protected(name))
+        tui::done_err("'" + name + "' is a protected package — use 'warp unprotect " + name + "' to override");
 
     auto files = db::get_files(name);
 
