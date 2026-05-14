@@ -260,7 +260,8 @@ void build_from_source(const fs::path& dir, bool install_after) {
     if (!fs::is_directory(dir))
         tui::done_err("Not a directory: " + dir.string());
 
-    fs::path warpbuild = dir / "WARPBUILD";
+    fs::path abs_dir  = fs::absolute(dir);
+    fs::path warpbuild = abs_dir / "WARPBUILD";
     if (!fs::exists(warpbuild))
         tui::done_err("WARPBUILD not found in " + dir.string());
 
@@ -337,7 +338,7 @@ void build_from_source(const fs::path& dir, bool install_after) {
             tui::log_step("Source extracted...", "ok");
         } else {
             // Local path
-            fs::path local = dir / source_url;
+            fs::path local = abs_dir / source_url;
             if (fs::is_directory(local))
                 for (const auto& e : fs::directory_iterator(local))
                     fs::copy(e.path(), srcdir / e.path().filename(), fs::copy_options::recursive);
