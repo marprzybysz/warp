@@ -23,7 +23,7 @@
 
 namespace fs = std::filesystem;
 
-static const std::string WARP_VERSION = "0.5.2";
+static const std::string WARP_VERSION = "0.5.3";
 
 static void usage() {
     std::cout << R"(Usage: warp [options] [package/file]

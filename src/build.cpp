@@ -222,12 +222,13 @@ static bool download_source(const std::string& url, const fs::path& dest) {
     if (!f) return false;
     CURL* curl = curl_easy_init();
     if (!curl) { fclose(f); return false; }
-    curl_easy_setopt(curl, CURLOPT_URL,           url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_file);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA,     f);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION,1L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT,       120L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT,     "warp/0.1.0");
+    curl_easy_setopt(curl, CURLOPT_URL,            url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION,  curl_write_file);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA,      f);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT,        120L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT,      "warp/0.1.0");
+    curl_easy_setopt(curl, CURLOPT_CAINFO,         "/etc/ssl/certs/ca-certificates.crt");
     CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
     fclose(f);

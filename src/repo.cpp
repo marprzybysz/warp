@@ -99,6 +99,7 @@ static bool curl_download(const std::string& url, const fs::path& dest) {
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS,       0L);
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_cb);
     curl_easy_setopt(curl, CURLOPT_USERAGENT,        "warp/0.1.0");
+    curl_easy_setopt(curl, CURLOPT_CAINFO,           "/etc/ssl/certs/ca-certificates.crt");
 
     CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
