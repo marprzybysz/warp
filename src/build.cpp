@@ -75,8 +75,10 @@ static void pack_warp(const fs::path& src_dir, const std::string& output_name) {
 
     for (const auto& entry_path : fs::recursive_directory_iterator(src_dir)) {
         struct archive_entry* entry = archive_entry_new();
-        std::string rel = fs::relative(entry_path.path(), src_dir).string();
+        std::string rel  = fs::relative(entry_path.path(), src_dir).string();
+        std::string full = entry_path.path().string();
         archive_entry_set_pathname(entry, rel.c_str());
+        archive_entry_copy_sourcepath(entry, full.c_str());
         archive_read_disk_entry_from_file(disk, entry, -1, nullptr);
         archive_write_header(a, entry);
 
