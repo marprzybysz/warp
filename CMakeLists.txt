@@ -6,6 +6,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(PkgConfig REQUIRED)
+
+execute_process(
+    COMMAND git rev-list --count HEAD
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE WARP_PATCH_NUM
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+if(NOT WARP_PATCH_NUM)
+    set(WARP_PATCH_NUM "0")
+endif()
 pkg_check_modules(LIBARCHIVE REQUIRED libarchive)
 pkg_check_modules(LIBCURL REQUIRED libcurl)
 
@@ -28,6 +39,7 @@ target_link_libraries(warp PRIVATE ${LIBARCHIVE_LIBRARIES} ${LIBCURL_LIBRARIES})
 
 target_include_directories(warp PRIVATE src ${LIBARCHIVE_INCLUDE_DIRS} ${LIBCURL_INCLUDE_DIRS})
 target_compile_options(warp PRIVATE -Wall -Wextra -Wpedantic)
+target_compile_definitions(warp PRIVATE WARP_PATCH_NUM="${WARP_PATCH_NUM}")
 
 install(TARGETS warp RUNTIME DESTINATION bin)
 install(FILES conf/warp.conf DESTINATION /etc/warp)
