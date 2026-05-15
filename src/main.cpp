@@ -83,9 +83,8 @@ System:
   -help              Show this help
 
 Modifiers (append to any command):
-  v   Verbose output  — warp -iv <file>    warp -Gv <pkg>    warp -Iv <pkg>
+  v   Verbose output  — warp -iv <file>    warp -Gv <pkg>
   q   Quiet output    — warp -iq <file>    warp -Gq <pkg>
-  -I  Alias for -G (install from repo)
 )";
 }
 
@@ -410,7 +409,6 @@ int main(int argc, char* argv[]) {
         else if (last == 'q') { tui::quiet   = true; tui::verbose = false; cmd.pop_back(); }
         else break;
     }
-    if (cmd == "-I") cmd = "-G";  // -I is alias for -G (Install from repo)
 
     if (cmd == "-i") {
         cmd_install_local(argc > 2 ? argv[2] : "");
