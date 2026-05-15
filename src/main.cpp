@@ -389,7 +389,8 @@ int main(int argc, char* argv[]) {
     // Pre-scan all args for modifier flags (can appear anywhere in command line)
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
-        if (a == "-q") { tui::quiet = true; tui::verbose = false; }
+        if (a == "-q" || a == "--quiet")   { tui::quiet = true;  tui::verbose = false; }
+        if (a == "--verbose")              { tui::verbose = true; tui::quiet   = false; }
     }
 
     config::load();

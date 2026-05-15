@@ -496,14 +496,17 @@ void scan_system() {
             ver = (so_pos != std::string::npos) ? soname.substr(so_pos + 4) : "system";
         }
 
+        if (!db::exists(name)) tui::vlog("  lib: " + name + " " + ver);
         register_pkg(name, ver, count);
 
         // Also register canonical distro package name (e.g. "c" → "glibc")
         auto alias_it = soname_to_pkg.find(name);
         if (alias_it != soname_to_pkg.end()) {
             const std::string& canonical = alias_it->second;
-            if (registered_canonical.insert(canonical).second)
+            if (registered_canonical.insert(canonical).second) {
+                if (!db::exists(canonical)) tui::vlog("  alias: " + name + " → " + canonical + " " + ver);
                 register_pkg(canonical, ver, count);
+            }
         }
     }
     pclose(p);
@@ -511,6 +514,7 @@ void scan_system() {
     // Register .pc packages that weren't caught by ldconfig (e.g. bash, coreutils-like tools)
     for (const auto& [name, ver] : pc) {
         if (db::exists(name)) continue;
+        tui::vlog("  pc: " + name + " " + ver);
         fs::path pkg_dir = db::db_root / name;
         fs::create_directories(pkg_dir);
         { std::ofstream wi(pkg_dir / "WARPINFO");

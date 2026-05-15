@@ -162,11 +162,14 @@ void sync() {
     auto repos = load_repos();
     for (const auto& r : repos) {
         tui::log_step("Syncing " + r.url + "...");
+        tui::vlog("Fetching: " + r.url + "/INDEX");
         fs::path dest = index_for(r.n);
         fs::create_directories(dest.parent_path());
 
-        if (!curl_download(r.url + "/INDEX", dest))
-            tui::done_err("Cannot fetch INDEX from " + r.url);
+        if (!curl_download(r.url + "/INDEX", dest)) {
+            tui::warn("Cannot fetch INDEX from " + r.url);
+            continue;
+        }
         tui::clear_progress();
 
         std::ifstream f(dest);
@@ -176,6 +179,7 @@ void sync() {
             if (!line.empty() && line.front() == '[') ++count;
 
         tui::log_step("Fetched INDEX (" + std::to_string(count) + " packages)...", "ok");
+        tui::vlog("Saved to: " + dest.string());
     }
 }
 
