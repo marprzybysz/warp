@@ -78,11 +78,14 @@ Protection:
   protected          List all protected packages
 
 System:
-  --version, -v      Show version and license
+  -v / --version     Show version and license
   -info              WARP version and system info
   -help              Show this help
-  -q                 Quiet mode — suppress all output except errors
-  --verbose          Verbose mode — show full install detail
+
+Modifiers (append to any command):
+  v   Verbose output  — warp -iv <file>    warp -Gv <pkg>    warp -Iv <pkg>
+  q   Quiet output    — warp -iq <file>    warp -Gq <pkg>
+  -I  Alias for -G (install from repo)
 )";
 }
 
@@ -342,7 +345,7 @@ static std::vector<std::string> pkg_args(int argc, char* argv[], int start) {
     std::vector<std::string> result;
     for (int i = start; i < argc; ++i) {
         std::string a = argv[i];
-        if (a == "-q" || a == "--verbose") continue;
+        if (a == "-q") continue;
         result.push_back(a);
     }
     return result;
@@ -370,10 +373,10 @@ int main(int argc, char* argv[]) {
     std::setlocale(LC_ALL, "C.UTF-8");
     if (argc < 2) { usage(); return 0; }
 
+    // Pre-scan all args for modifier flags (can appear anywhere in command line)
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
-        if (a == "-q")        { tui::quiet = true; tui::verbose = false; }
-        if (a == "--verbose") { tui::verbose = true; tui::quiet = false; }
+        if (a == "-q") { tui::quiet = true; tui::verbose = false; }
     }
 
     config::load();
@@ -384,7 +387,16 @@ int main(int argc, char* argv[]) {
     if (const char* e = getenv("WARP_DB")) db_path = e;
     db::init(db_path);
 
+    // Normalize command: strip trailing v/q modifiers so -iv → -i, -Gq → -G
+    // Only applies to short flags (single dash, not --)
     std::string cmd = argv[1];
+    while (cmd.size() > 2 && cmd[0] == '-' && cmd[1] != '-') {
+        char last = cmd.back();
+        if      (last == 'v') { tui::verbose = true; tui::quiet   = false; cmd.pop_back(); }
+        else if (last == 'q') { tui::quiet   = true; tui::verbose = false; cmd.pop_back(); }
+        else break;
+    }
+    if (cmd == "-I") cmd = "-G";  // -I is alias for -G (Install from repo)
 
     if (cmd == "-i") {
         cmd_install_local(argc > 2 ? argv[2] : "");
@@ -434,7 +446,7 @@ int main(int argc, char* argv[]) {
     } else if (cmd == "protect")   { protect::add(argc > 2 ? argv[2] : ""); }
     else if (cmd == "unprotect")   { protect::remove(argc > 2 ? argv[2] : ""); }
     else if (cmd == "protected")   { protect::list(); }
-    else if (cmd == "--version" || cmd == "-v")  { cmd_version(); }
+    else if (cmd == "--version" || cmd == "-v") { cmd_version(); }
     else if (cmd == "-info")      { cmd_sysinfo(); }
     else if (cmd == "-help" || cmd == "--help" || cmd == "-h") { usage(); }
     else if (cmd == "-q")         { usage(); }
