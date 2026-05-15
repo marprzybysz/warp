@@ -19,25 +19,20 @@ echo "Building WARP — Warp Archive Repository Packager"
 echo ""
 
 # Check build tools
-for cmd in cmake make pkg-config; do
+for cmd in g++ pkg-config; do
     command -v "$cmd" &>/dev/null || { echo "ERROR: $cmd not found"; exit 1; }
 done
 for lib in libarchive libcurl; do
     pkg-config --exists "$lib" || { echo "ERROR: $lib dev package not found"; exit 1; }
 done
 
-BUILD_DIR="$SCRIPT_DIR/build"
-mkdir -p "$BUILD_DIR"
+SRC_DIR="$SCRIPT_DIR/src"
+SRCS=$(find "$SRC_DIR" -name '*.cpp' | tr '\n' ' ')
+CXXFLAGS="-O2 -std=c++17 -DWARP_PATCH_NUM=\"manual\""
+LIBS="$(pkg-config --cflags --libs libarchive libcurl)"
 
-cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" \
-    -DCMAKE_INSTALL_PREFIX="$PREFIX" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_SYSCONFDIR=/etc \
-    -DCMAKE_INSTALL_MANDIR="$PREFIX/share/man" \
-    -DCMAKE_SILENT_MAKEFILE=ON
-
-make -C "$BUILD_DIR" -j"$(nproc)"
-make -C "$BUILD_DIR" install
+g++ $CXXFLAGS -I"$SRC_DIR" $SRCS $LIBS -o "$SCRIPT_DIR/warp"
+install -Dm755 "$SCRIPT_DIR/warp" "$PREFIX/bin/warp"
 
 echo "  $PREFIX/bin/warp"
 
