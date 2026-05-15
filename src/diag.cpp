@@ -11,6 +11,8 @@
 #include <iomanip>
 #include <array>
 #include <map>
+#include <unordered_map>
+#include <unordered_set>
 #include <cstdio>
 
 namespace diag {
@@ -353,6 +355,36 @@ static std::map<std::string, std::string> load_pc_versions() {
     return result;
 }
 
+// Maps soname-derived names to canonical distro package names.
+// libc.so.6 → name="c" → also register as "glibc".
+static const std::unordered_map<std::string, std::string> soname_to_pkg = {
+    {"c",        "glibc"},
+    {"m",        "glibc"},
+    {"dl",       "glibc"},
+    {"pthread",  "glibc"},
+    {"rt",       "glibc"},
+    {"util",     "glibc"},
+    {"resolv",   "glibc"},
+    {"nsl",      "glibc"},
+    {"anl",      "glibc"},
+    {"stdc++",   "gcc-runtime"},
+    {"gcc_s",    "gcc-runtime"},
+    {"gomp",     "gcc-runtime"},
+    {"atomic",   "gcc-runtime"},
+};
+
+static void register_pkg(const std::string& name, const std::string& ver, int& count) {
+    if (db::exists(name)) return;
+    fs::path pkg_dir = db::db_root / name;
+    fs::create_directories(pkg_dir);
+    { std::ofstream wi(pkg_dir / "WARPINFO");
+      wi << "name="    << name << "\n"
+         << "version=" << ver  << "\n"
+         << "source=system\n"; }
+    { std::ofstream src(pkg_dir / "SOURCE"); src << "system\n"; }
+    ++count;
+}
+
 void scan_system() {
     tui::log_step("Scanning system libraries via ldconfig and pkg-config...");
 
@@ -362,6 +394,7 @@ void scan_system() {
     if (!p) tui::done_err("ldconfig not found — cannot scan system libraries");
 
     int count = 0;
+    std::unordered_set<std::string> registered_canonical;
     std::array<char, 512> buf{};
     bool first = true;
     while (fgets(buf.data(), buf.size(), p)) {
@@ -394,17 +427,15 @@ void scan_system() {
             ver = (so_pos != std::string::npos) ? soname.substr(so_pos + 4) : "system";
         }
 
-        if (db::exists(name)) continue; // don't overwrite user-installed packages
+        register_pkg(name, ver, count);
 
-        fs::path pkg_dir = db::db_root / name;
-        fs::create_directories(pkg_dir);
-        { std::ofstream wi(pkg_dir / "WARPINFO");
-          wi << "name="    << name    << "\n"
-             << "version=" << ver     << "\n"
-             << "source=system\n"; }
-        { std::ofstream src(pkg_dir / "SOURCE"); src << "system\n"; }
-
-        ++count;
+        // Also register canonical distro package name (e.g. "c" → "glibc")
+        auto alias_it = soname_to_pkg.find(name);
+        if (alias_it != soname_to_pkg.end()) {
+            const std::string& canonical = alias_it->second;
+            if (registered_canonical.insert(canonical).second)
+                register_pkg(canonical, ver, count);
+        }
     }
     pclose(p);
 
