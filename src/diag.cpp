@@ -358,19 +358,88 @@ static std::map<std::string, std::string> load_pc_versions() {
 // Maps soname-derived names to canonical distro package names.
 // libc.so.6 → name="c" → also register as "glibc".
 static const std::unordered_map<std::string, std::string> soname_to_pkg = {
-    {"c",        "glibc"},
-    {"m",        "glibc"},
-    {"dl",       "glibc"},
-    {"pthread",  "glibc"},
-    {"rt",       "glibc"},
-    {"util",     "glibc"},
-    {"resolv",   "glibc"},
-    {"nsl",      "glibc"},
-    {"anl",      "glibc"},
-    {"stdc++",   "gcc-runtime"},
-    {"gcc_s",    "gcc-runtime"},
-    {"gomp",     "gcc-runtime"},
-    {"atomic",   "gcc-runtime"},
+    // glibc
+    {"c",          "glibc"},
+    {"m",          "glibc"},
+    {"dl",         "glibc"},
+    {"pthread",    "glibc"},
+    {"rt",         "glibc"},
+    {"util",       "glibc"},
+    {"resolv",     "glibc"},
+    {"nsl",        "glibc"},
+    {"anl",        "glibc"},
+    // gcc runtime
+    {"stdc++",     "gcc-runtime"},
+    {"gcc_s",      "gcc-runtime"},
+    {"gomp",       "gcc-runtime"},
+    {"atomic",     "gcc-runtime"},
+    // compression
+    {"z",          "zlib"},
+    {"bz2",        "bzip2"},
+    {"lzma",       "xz"},
+    {"lz4",        "lz4"},
+    {"zstd",       "zstd"},
+    // crypto / tls
+    {"ssl",        "openssl"},
+    {"crypto",     "openssl"},
+    // archive
+    {"archive",    "libarchive"},
+    // curl
+    {"curl",       "libcurl"},
+    // xml / html
+    {"xml2",       "libxml2"},
+    {"xslt",       "libxslt"},
+    // image
+    {"png16",      "libpng"},
+    {"png",        "libpng"},
+    {"jpeg",       "libjpeg"},
+    {"webp",       "libwebp"},
+    {"tiff",       "libtiff"},
+    // fonts / graphics
+    {"freetype",   "freetype"},
+    {"fontconfig", "fontconfig"},
+    {"cairo",      "cairo"},
+    {"pixman-1",   "pixman"},
+    {"harfbuzz",   "harfbuzz"},
+    {"pango-1.0",  "pango"},
+    // glib / gobject
+    {"glib-2.0",   "glib"},
+    {"gobject-2.0","glib"},
+    {"gio-2.0",    "glib"},
+    {"gmodule-2.0","glib"},
+    // ffi / readline / ncurses
+    {"ffi",        "libffi"},
+    {"readline",   "readline"},
+    {"ncurses",    "ncurses"},
+    {"ncursesw",   "ncurses"},
+    {"tinfo",      "ncurses"},
+    // pcre
+    {"pcre2-8",    "pcre2"},
+    {"pcre",       "pcre"},
+    // sqlite
+    {"sqlite3",    "sqlite"},
+    // expat
+    {"expat",      "expat"},
+    // dbus
+    {"dbus-1",     "dbus"},
+    // X11 / wayland
+    {"X11",        "libx11"},
+    {"Xext",       "libxext"},
+    {"xcb",        "libxcb"},
+    {"wayland-client", "wayland"},
+    {"wayland-server", "wayland"},
+    // audio
+    {"asound",     "alsa-lib"},
+    {"pulse",      "pulseaudio"},
+    {"pipewire-0.3","pipewire"},
+    // systemd / udev
+    {"udev",       "eudev"},
+    // uuid
+    {"uuid",       "util-linux"},
+    // python
+    {"python3.11", "python3"},
+    {"python3.12", "python3"},
+    {"python3.13", "python3"},
 };
 
 static void register_pkg(const std::string& name, const std::string& ver, int& count) {
