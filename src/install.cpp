@@ -44,14 +44,14 @@ void from_warp(const fs::path& file, bool resolve_deps) {
     std::string name    = read_field(info_path, "name");
     std::string version = read_field(info_path, "version");
 
-    if (!tui::quiet)
-        std::cout << "Selecting " << name << " " << version << " [" << size << "]\n";
-
+    tui::pkg_header(name, version, size);
     tui::progress_bar(10, "Resolving  " + name);
 
     // Auto-scan system libs so deps like glibc are always visible in DB.
-    if (resolve_deps)
+    if (resolve_deps) {
+        tui::vlog("Scanning system libraries...");
         diag::scan_system_quiet();
+    }
 
     // Resolve and auto-install deps from the package's own DEPS file.
     // Skipped when called from repo::install which already resolved the full tree.
@@ -63,12 +63,24 @@ void from_warp(const fs::path& file, bool resolve_deps) {
             if (std::getline(df, deps_line) && !deps_line.empty()) {
                 std::istringstream ss(deps_line);
                 std::string dep;
+                int n_satisfied = 0;
+                std::vector<std::string> to_install;
                 while (std::getline(ss, dep, ',')) {
                     dep.erase(0, dep.find_first_not_of(' '));
                     dep.erase(dep.find_last_not_of(' ') + 1);
-                    if (dep.empty() || db::exists(dep)) continue;
-                    tui::log_step("Installing dependency: " + dep + "...");
-                    repo::install(dep);
+                    if (dep.empty()) continue;
+                    if (db::exists(dep)) {
+                        tui::vlog("↳ " + dep + " — satisfied");
+                        ++n_satisfied;
+                    } else {
+                        to_install.push_back(dep);
+                    }
+                }
+                if (!tui::quiet && n_satisfied > 0 && !tui::verbose)
+                    std::cout << "  \033[2m↳ " << n_satisfied << (n_satisfied == 1 ? " dependency" : " dependencies") << " satisfied\033[0m\n";
+                for (const auto& dep2 : to_install) {
+                    tui::log_step("  ↳ " + dep2 + " — installing...");
+                    repo::install(dep2);
                 }
             }
         }
@@ -110,6 +122,7 @@ void from_warp(const fs::path& file, bool resolve_deps) {
             tui::done_err(msg);
         }
 
+        tui::vlog("Installing " + std::to_string(total) + " files...");
         int count = 0;
         try {
             for (const auto& src : src_files) {
@@ -132,10 +145,13 @@ void from_warp(const fs::path& file, bool resolve_deps) {
     }
 
     tui::progress_bar(95, "Registering" + name);
+    tui::vlog("Registering " + name + " in database...");
     db::save(name, version, "warp", installed_files);
     tui::progress_bar(100, "Done       " + name);
     db::log("install", name, version);
     fs::remove_all(tmpdir);
+    if (!tui::quiet && !tui::verbose && !installed_files.empty())
+        std::cout << "  \033[2m↳ " << installed_files.size() << " files installed\033[0m\n";
     tui::done_ok();
 }
 

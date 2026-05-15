@@ -5,10 +5,15 @@
 namespace tui {
 
 extern bool quiet;
+extern bool verbose;
 extern bool use_color;
 extern bool queue_mode;
 
 void log_step(const std::string& msg, const std::string& status = "");
+void vlog(const std::string& msg);          // verbose-only output
+void pkg_header(const std::string& name,    // install header: ◆ name ver [size]
+                const std::string& ver,
+                const std::string& size);
 void progress_bar(int percent, const std::string& action = "");
 void clear_progress();
 void queue_msg(const std::string& msg);

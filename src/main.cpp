@@ -81,7 +81,8 @@ System:
   --version, -v      Show version and license
   -info              WARP version and system info
   -help              Show this help
-  -q                 Quiet mode (can appear anywhere)
+  -q                 Quiet mode — suppress all output except errors
+  --verbose          Verbose mode — show full install detail
 )";
 }
 
@@ -341,7 +342,7 @@ static std::vector<std::string> pkg_args(int argc, char* argv[], int start) {
     std::vector<std::string> result;
     for (int i = start; i < argc; ++i) {
         std::string a = argv[i];
-        if (a == "-q") continue;
+        if (a == "-q" || a == "--verbose") continue;
         result.push_back(a);
     }
     return result;
@@ -369,8 +370,11 @@ int main(int argc, char* argv[]) {
     std::setlocale(LC_ALL, "C.UTF-8");
     if (argc < 2) { usage(); return 0; }
 
-    for (int i = 1; i < argc; ++i)
-        if (std::string(argv[i]) == "-q") tui::quiet = true;
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "-q")        { tui::quiet = true; tui::verbose = false; }
+        if (a == "--verbose") { tui::verbose = true; tui::quiet = false; }
+    }
 
     config::load();
     if (config::cfg.quiet)  tui::quiet     = true;

@@ -10,6 +10,7 @@
 namespace tui {
 
 bool quiet      = false;
+bool verbose    = false;
 bool use_color  = true;
 bool queue_mode = false;
 
@@ -129,6 +130,24 @@ void log_step(const std::string& msg, const std::string& status) {
 void queue_msg(const std::string& msg) {
     erase_bar();
     std::cout << msg << "\n";
+    redraw_bar();
+}
+
+void vlog(const std::string& msg) {
+    if (!verbose || quiet) return;
+    erase_bar();
+    std::cout << c("\033[2m") << "  " << msg << c("\033[0m") << "\n";
+    redraw_bar();
+}
+
+void pkg_header(const std::string& name, const std::string& ver, const std::string& size) {
+    if (quiet) return;
+    erase_bar();
+    if (use_color)
+        std::cout << "  \033[1;35m◆\033[0m " << name << " " << ver
+                  << "  \033[2m[" << size << "]\033[0m\n";
+    else
+        std::cout << "  ◆ " << name << " " << ver << "  [" << size << "]\n";
     redraw_bar();
 }
 
