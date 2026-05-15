@@ -89,12 +89,6 @@ Append `v` or `q` to any short command to control verbosity:
 | `v` | Verbose — full install detail | `warp -iv pkg.wrp`, `warp -Gv firefox` |
 | `q` | Quiet — errors only | `warp -iq pkg.wrp`, `warp -Gq firefox` |
 
-`-I` is an alias for `-G` (install from repo):
-
-```bash
-warp -Iv firefox    # same as: warp -Gv firefox
-warp -Iq firefox    # same as: warp -Gq firefox
-```
 
 **Verbose output** shows each dependency status, file count, and registration step:
 ```
