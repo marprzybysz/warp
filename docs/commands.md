@@ -62,32 +62,59 @@
 | `warp --log` | Show operation history |
 | `warp --rollback <pkg>` | Revert a package to its previous version |
 
+## Protection
+
+| Command | Description |
+|---|---|
+| `warp protect <pkg>` | Add package to protected list (blocks remove/upgrade) |
+| `warp unprotect <pkg>` | Remove package from protected list |
+| `warp protected` | List all protected packages |
+
 ## System
 
 | Command | Description |
 |---|---|
-| `warp --version`, `warp -v` | Show version, copyright, and license |
+| `warp -v` / `warp --version` | Show version, copyright, and license |
 | `warp -info` | Show WARP version, arch, kernel, and package count |
 | `warp -help` | Show usage summary |
-| `warp -q` | Quiet mode (can appear anywhere in the command line) |
 
 ---
 
-## Quiet Mode
+## Output Modifiers
 
-Append `-q` to any command to suppress all output except the final result:
+Append `v` or `q` to any short command to control verbosity:
+
+| Modifier | Effect | Example |
+|---|---|---|
+| `v` | Verbose — full install detail | `warp -iv pkg.wrp`, `warp -Gv firefox` |
+| `q` | Quiet — errors only | `warp -iq pkg.wrp`, `warp -Gq firefox` |
+
+`-I` is an alias for `-G` (install from repo):
 
 ```bash
-warp -i firefox.wrp -q
-# output: Gotowe
+warp -Iv firefox    # same as: warp -Gv firefox
+warp -Iq firefox    # same as: warp -Gq firefox
 ```
 
-On error in quiet mode, only the error message is shown:
-
-```bash
-warp -D nonexistent -q
-# output: ERROR: Package 'nonexistent' is not installed
+**Verbose output** shows each dependency status, file count, and registration step:
 ```
+  ◆ tar 1.35  [1.17 MB]
+  Scanning system libraries...
+  ↳ glibc — satisfied
+  Installing 47 files...
+  Registering tar in database...
+Done!
+```
+
+**Normal output** (default) shows a compact summary:
+```
+  ◆ tar 1.35  [1.17 MB]
+  ↳ 1 dependency satisfied
+  ↳ 47 files installed
+Done!
+```
+
+**Quiet output** shows only the progress bar and errors.
 
 ---
 

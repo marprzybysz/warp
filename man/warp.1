@@ -135,18 +135,54 @@ Show the history of install, remove, and upgrade operations.
 Revert a package to its previously cached version.
 .SH SYSTEM
 .TP
-.BR \-\-version ", " \-v
+.BR \-v ", " \-\-version
 Print WARP version, copyright, and license information.
 .TP
 .B \-info
 Print WARP version, system architecture, kernel, and package count.
 .TP
-.B \-q
-Quiet mode: suppress verbose log output. Progress bar and errors are
-still shown. This flag can appear anywhere in the command line.
-.TP
 .BR \-help ", " \-\-help ", " \-h
 Show usage summary.
+.SH OUTPUT MODIFIERS
+Append
+.B v
+or
+.B q
+to any short command to control verbosity.
+.TP
+.B v
+Verbose mode \(em show full install detail: each dependency status, file count,
+and database registration. Example:
+.B warp \-iv pkg.wrp
+or
+.BR "warp \-Gv firefox" .
+.TP
+.B q
+Quiet mode \(em suppress all output except errors and the progress bar.
+Example:
+.B warp \-iq pkg.wrp
+or
+.BR "warp \-Gq firefox" .
+.PP
+.B \-I
+is an alias for
+.B \-G
+(install from repository). Use it interchangeably:
+.B warp \-Iv firefox
+is equivalent to
+.BR "warp \-Gv firefox" .
+.SH PROTECTION
+.TP
+.BR "protect " "\fIpkg\fR"
+Add a package to the protected list. Protected packages cannot be removed
+or upgraded via WARP without first running
+.BR "warp unprotect" .
+.TP
+.BR "unprotect " "\fIpkg\fR"
+Remove a package from the protected list.
+.TP
+.B protected
+List all currently protected packages.
 .SH PACKAGE FORMAT
 A
 .B .wrp

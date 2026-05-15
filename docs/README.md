@@ -23,13 +23,19 @@ warp --sync
 # Install a package from repository
 warp -G tmux
 
+# Install with verbose output
+warp -Gv tmux
+
 # Install a local package
 warp -i firefox-92.0-x86_64.wrp
+
+# Install local package quietly
+warp -iq firefox-92.0-x86_64.wrp
 
 # Remove a package
 warp -D firefox
 
-# List installed packages (colored, with pager)
+# List installed packages (colored, fullscreen pager)
 warp -A
 
 # Show package info
@@ -40,6 +46,9 @@ warp -buildI ./tmux/
 
 # Package count (for fastfetch/neofetch)
 warp -Q
+
+# Show version
+warp -v
 ```
 
 ---
