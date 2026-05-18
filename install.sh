@@ -58,13 +58,17 @@ fi
     echo "  $MANDIR/warp.1"
 }
 
-# Shell completions
+# Shell completions — canonical location + per-shell wiring
 COMP_DIR="$SCRIPT_DIR/contrib/completions"
+WARP_COMP="$PREFIX/share/warp/completions"
+mkdir -p "$WARP_COMP"
 if [[ -f "$COMP_DIR/warp.fish" ]]; then
+    install -Dm644 "$COMP_DIR/warp.fish" "$WARP_COMP/warp.fish"
     install -Dm644 "$COMP_DIR/warp.fish" "$PREFIX/share/fish/vendor_completions.d/warp.fish"
     echo "  $PREFIX/share/fish/vendor_completions.d/warp.fish"
 fi
 if [[ -f "$COMP_DIR/warp.zsh" ]]; then
+    install -Dm644 "$COMP_DIR/warp.zsh" "$WARP_COMP/warp.zsh"
     install -Dm644 "$COMP_DIR/warp.zsh" "$PREFIX/share/zsh/site-functions/_warp"
     echo "  $PREFIX/share/zsh/site-functions/_warp"
 fi
