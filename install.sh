@@ -58,6 +58,17 @@ fi
     echo "  $MANDIR/warp.1"
 }
 
+# Shell completions
+COMP_DIR="$SCRIPT_DIR/contrib/completions"
+if [[ -f "$COMP_DIR/warp.fish" ]]; then
+    install -Dm644 "$COMP_DIR/warp.fish" "$PREFIX/share/fish/vendor_completions.d/warp.fish"
+    echo "  $PREFIX/share/fish/vendor_completions.d/warp.fish"
+fi
+if [[ -f "$COMP_DIR/warp.zsh" ]]; then
+    install -Dm644 "$COMP_DIR/warp.zsh" "$PREFIX/share/zsh/site-functions/_warp"
+    echo "  $PREFIX/share/zsh/site-functions/_warp"
+fi
+
 # Runtime dirs
 mkdir -p /var/lib/warp/db /var/cache/warp/index /var/cache/warp/packages
 echo "  /var/lib/warp/db"
